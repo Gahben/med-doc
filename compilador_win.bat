@@ -18,9 +18,8 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-echo [2/4] Instalando pacotes detectados (Router, Toast, Date, Dropzone, etc)...
-:: Adicionei react-dropzone e framer-motion (comum para animações)
-call npm install react-router-dom react-hot-toast date-fns axios react-dropzone framer-motion --save
+echo [2/4] Instalando pacotes (Frontend + Servidor)...
+call npm install react-router-dom react-hot-toast date-fns axios react-dropzone framer-motion express cors --save
 
 echo.
 echo [3/4] Atualizando dependencias gerais...
