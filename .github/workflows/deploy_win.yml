@@ -1,0 +1,60 @@
+name: CI — Build & Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Build Vite
+    runs-on: ubuntu-latest  # O GitHub Actions roda na nuvem, não no seu PC
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        # ⚠️ IMPORTANTE: O GitHub Desktop já gerencia seu repositório local
+        # Este passo funciona automaticamente - não precisa configurar nada no seu PC
+        # O Actions vai clonar seu código na nuvem para fazer o build
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+        # 💡 Dica: No seu Windows, você precisa ter o Node.js instalado localmente
+        # Baixe em: https://nodejs.org/ (versão 20 LTS recomendada)
+        # Para verificar se tem: node --version no PowerShell
+
+      - name: Install dependencies
+        run: npm ci
+        # 📦 Isso instala as dependências na nuvem (GitHub Actions)
+        # No seu PC, você já deve ter rodado: npm install
+
+      - name: Build
+        env:
+          VITE_SUPABASE_URL:      ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: npm run build
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ github.sha }}
+          path: dist/
+          retention-days: 3
+
+  notify-render:
+    name: Render Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Deploy status
+        run: |
+          echo "✅ Build aprovado — Render iniciará deploy automaticamente."
+          echo "   Acesse https://dashboard.render.com para acompanhar."
+          echo "   Commit: ${{ github.sha }}"
+          echo "   Autor:  ${{ github.actor }}"
