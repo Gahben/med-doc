@@ -1,0 +1,44 @@
+-- ============================================================
+-- NOTA: Migração para Cloudflare R2 (storage alternativo)
+-- ============================================================
+--
+-- O Supabase Storage tem limite de 1 GB no plano gratuito.
+-- O Cloudflare R2 oferece 10 GB grátis/mês.
+--
+-- Para migrar o storage para R2 sem alterar o restante do app:
+--
+-- 1. No arquivo src/lib/storage.js, substitua APENAS storageService:
+--
+--    import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
+--    import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+--
+--    const r2 = new S3Client({
+--      region: 'auto',
+--      endpoint: `https://${CF_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+--      credentials: {
+--        accessKeyId:     import.meta.env.VITE_R2_ACCESS_KEY,
+--        secretAccessKey: import.meta.env.VITE_R2_SECRET_KEY,
+--      },
+--    })
+--
+--    export const storageService = {
+--      upload: (file, path) =>
+--        r2.send(new PutObjectCommand({ Bucket: 'prontuarios', Key: path, Body: file, ContentType: file.type })),
+--
+--      getSignedUrl: (path, expiresIn = 3600) =>
+--        getSignedUrl(r2, new GetObjectCommand({ Bucket: 'prontuarios', Key: path }), { expiresIn }),
+--
+--      remove: (paths) =>
+--        Promise.all((Array.isArray(paths) ? paths : [paths]).map(p =>
+--          r2.send(new DeleteObjectCommand({ Bucket: 'prontuarios', Key: p }))
+--        )),
+--    }
+--
+-- 2. Adicione as env vars:
+--    VITE_R2_ACCESS_KEY=...
+--    VITE_R2_SECRET_KEY=...
+--    VITE_CF_ACCOUNT_ID=...
+--
+-- O banco (PostgreSQL), auth e todo o restante permanecem no Supabase.
+-- ============================================================
+SELECT 1; -- placeholder para arquivo ser válido SQL

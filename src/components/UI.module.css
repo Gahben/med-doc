@@ -1,0 +1,163 @@
+.pageHeader {
+  margin-bottom: 28px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.pageTitle { font-size: 22px; font-weight: 600; letter-spacing: -0.3px; }
+.pageSubtitle { font-size: 14px; color: var(--text2); margin-top: 4px; }
+.pageActions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ─── BUTTONS ─── */
+.btnAccent, .btnSec, .btnDanger {
+  border-radius: 8px;
+  padding: 9px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+  transition: opacity 0.12s, background 0.12s;
+  border: none;
+  min-height: 38px;
+}
+.btnAccent svg, .btnSec svg, .btnDanger svg { width: 15px; height: 15px; flex-shrink: 0; }
+
+.btnAccent  { background: var(--accent); color: #fff; }
+.btnAccent:hover:not(:disabled) { opacity: 0.88; }
+
+.btnSec { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
+.btnSec:hover:not(:disabled) { background: var(--surface2); }
+
+.btnDanger { background: var(--danger); color: #fff; }
+.btnDanger:hover:not(:disabled) { opacity: 0.88; }
+
+.btnAccent:disabled, .btnSec:disabled, .btnDanger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.small { padding: 6px 12px; font-size: 13px; min-height: 32px; }
+
+/* ─── BADGES ─── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 20px;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+.badgeApproved { background: var(--accent-light); color: var(--accent); }
+.badgePending  { background: var(--warning-light); color: var(--warning); }
+.badgeReproved { background: var(--danger-light);  color: var(--danger); }
+.badgeTrash    { background: var(--accent2-light); color: var(--accent2); }
+.badgeLocked   { background: #e8eaf6; color: #3949ab; }
+
+.roleAdmin    { background: #e8eaf6; color: #3949ab; }
+.roleRevisor  { background: var(--purple-light); color: var(--purple); }
+.roleOperador { background: var(--accent-light); color: var(--accent); }
+
+/* ─── CARD ─── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+}
+
+/* ─── EMPTY STATE ─── */
+.emptyState {
+  padding: 60px 24px;
+  text-align: center;
+  color: var(--text3);
+}
+.emptyIcon { margin-bottom: 12px; }
+.emptyIcon svg { width: 40px; height: 40px; }
+.emptyState h3 { font-size: 16px; font-weight: 500; color: var(--text2); margin-bottom: 6px; }
+.emptyState p  { font-size: 14px; }
+
+/* ─── SKELETON ─── */
+.skeletonRow td { padding: 14px 16px; }
+.skeleton {
+  display: block;
+  height: 14px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--surface2) 25%, var(--border) 50%, var(--surface2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+}
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+/* ─── MODAL ─── */
+.modalOverlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 24px;
+  backdrop-filter: blur(2px);
+}
+.modalBox {
+  background: var(--surface);
+  border-radius: 14px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  animation: fadeIn 0.15s ease;
+}
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 0;
+}
+.modalHeader h3 { font-size: 17px; font-weight: 600; }
+.modalClose {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text3);
+  padding: 4px;
+  display: flex;
+  border-radius: 6px;
+  transition: background 0.12s;
+}
+.modalClose:hover { background: var(--surface2); }
+.modalClose svg { width: 18px; height: 18px; }
+.modalBody { padding: 20px 24px 24px; }
+
+/* ─── FORM FIELDS ─── */
+.field { margin-bottom: 16px; }
+.fieldLabel {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: var(--text2);
+}
+.required { color: var(--danger); }
+
+.input, .select, .textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-family: inherit;
+  background: var(--surface);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s;
+  appearance: none;
+}
+.input:focus, .select:focus, .textarea:focus { border-color: var(--accent); }
+.textarea { min-height: 80px; resize: vertical; }

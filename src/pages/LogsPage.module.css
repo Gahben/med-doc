@@ -1,0 +1,84 @@
+.filters { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+
+.filterBtn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 5px 14px;
+  font-size: 13px;
+  color: var(--text2);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.12s;
+}
+.filterBtn.active, .filterBtn:hover {
+  background: var(--accent-light);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.logWrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.loadingWrap { display: flex; justify-content: center; padding: 60px; }
+
+.entry {
+  display: flex;
+  gap: 14px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  align-items: flex-start;
+}
+.entry:last-child { border-bottom: none; }
+
+.icon {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.icon svg { width: 14px; height: 14px; }
+
+.iconUpload   { background: var(--accent-light);  color: var(--accent); }
+.iconDownload { background: var(--info-light);    color: var(--info); }
+.iconLogin    { background: var(--surface2);      color: var(--text2); }
+.iconApproved { background: var(--accent-light);  color: var(--accent); }
+.iconReproved { background: var(--danger-light);  color: var(--danger); }
+.iconPrint    { background: var(--accent2-light); color: var(--accent2); }
+.iconDelete   { background: var(--danger-light);  color: var(--danger); }
+
+.body { flex: 1; }
+.action { font-size: 14px; font-weight: 500; }
+.meta   { font-size: 13px; color: var(--text2); margin-top: 2px; }
+.time   { font-size: 12px; color: var(--text3); white-space: nowrap; margin-top: 3px; }
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 20px;
+  font-size: 14px;
+  color: var(--text2);
+}
+
+.pageBtn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.12s;
+}
+.pageBtn:hover:not(:disabled) { background: var(--surface2); }
+.pageBtn:disabled { opacity: 0.4; cursor: not-allowed; }

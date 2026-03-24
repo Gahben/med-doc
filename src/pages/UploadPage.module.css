@@ -1,0 +1,112 @@
+.grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.dropZone {
+  border: 2px dashed var(--border);
+  border-radius: 10px;
+  padding: 48px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  background: var(--surface);
+}
+.dropZone:hover, .dropZone.drag {
+  border-color: var(--accent);
+  background: var(--accent-light);
+}
+.dropZone.hasFile {
+  border-color: var(--accent);
+  background: var(--accent-light);
+}
+.dropZone svg {
+  width: 40px;
+  height: 40px;
+  color: var(--text3);
+  margin-bottom: 12px;
+}
+.dropZone.hasFile svg { color: var(--accent); }
+.dropZone p {
+  font-size: 15px;
+  color: var(--text2);
+  font-weight: 500;
+}
+.dropZone.hasFile p { color: var(--accent); }
+.dropZone span { font-size: 12px; color: var(--text3); display: block; margin-top: 4px; }
+
+.fieldsCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+}
+
+.fieldsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 16px;
+}
+
+.fullCol { grid-column: 1 / -1; }
+
+.toggleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 0;
+  border-top: 1px solid var(--border);
+  gap: 16px;
+}
+.toggleRow label:first-child { font-size: 14px; font-weight: 500; }
+.toggleRow small { font-size: 12px; color: var(--text2); display: block; margin-top: 2px; }
+
+.toggle { position: relative; width: 38px; height: 22px; flex-shrink: 0; cursor: pointer; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggleSlider {
+  position: absolute;
+  inset: 0;
+  background: var(--border);
+  border-radius: 11px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+.toggleSlider::before {
+  content: '';
+  position: absolute;
+  width: 16px; height: 16px;
+  left: 3px; top: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: 0.2s;
+}
+.toggle input:checked + .toggleSlider { background: var(--accent); }
+.toggle input:checked + .toggleSlider::before { transform: translateX(16px); }
+
+.formActions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+/* Success */
+.successCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 60px 24px;
+  text-align: center;
+}
+.checkCircle {
+  width: 64px; height: 64px;
+  background: var(--accent-light);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+}
+.checkCircle svg { width: 28px; height: 28px; color: var(--accent); }
+.successCard h3 { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
+.successCard p  { font-size: 14px; color: var(--text2); margin-bottom: 24px; }

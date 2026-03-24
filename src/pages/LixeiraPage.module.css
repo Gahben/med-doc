@@ -1,0 +1,45 @@
+.tableWrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.table { width: 100%; border-collapse: collapse; }
+
+.table thead th {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 13px 16px;
+  text-align: left;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+}
+
+.row {
+  border-bottom: 1px solid var(--border);
+  transition: background 0.1s;
+}
+.row:last-child { border-bottom: none; }
+.row:hover { background: var(--surface2); }
+.row td { padding: 13px 16px; font-size: 14px; }
+
+.tdName  { font-weight: 500; }
+.tdCode  { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--text2); }
+.tdMuted { color: var(--text2); font-size: 13px; }
+.tdDate  { color: var(--text2); font-size: 13px; }
+
+.actions { display: flex; gap: 6px; }
+
+.confirmText {
+  font-size: 14px;
+  color: var(--text2);
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+.confirmText strong { color: var(--text); }
+
+.confirmActions { display: flex; gap: 8px; flex-wrap: wrap; }

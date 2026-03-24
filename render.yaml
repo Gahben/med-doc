@@ -1,0 +1,21 @@
+# render.yaml — MedDoc no Render (Web Service Node.js, plano Free)
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: meddoc
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: node server.cjs
+
+    envVars:
+      - key: VITE_SUPABASE_URL
+        sync: false       # preencher no dashboard do Render
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false
+      - key: NODE_ENV
+        value: production
+
+    # Headers de segurança (via middleware — ver server.cjs)
+    # O Render Free não suporta headers declarativos em Web Services
