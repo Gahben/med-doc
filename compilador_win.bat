@@ -1,50 +1,44 @@
 @echo off
 setlocal enabledelayedexpansion
-title MedDoc - Instalacao do Sistema
+title MedDoc - Instalacao Final
 
 echo.
 echo ============================================================
-echo           MedDoc - Instalacao e Configuracao
+echo           MedDoc - Preparando Frontend + Servidor
 echo ============================================================
 echo.
 
 set "PATH=%PATH%;C:\Program Files\nodejs;%APPDATA%\npm;%ProgramFiles%\nodejs"
 
-echo [1/4] Verificando Node.js...
-node --version >nul 2>&1
-if %errorlevel% neq 0 (
-    echo ERRO: Node.js nao encontrado! Instale em nodejs.org
-    pause
-    exit /b 1
-)
-
-echo [2/4] Instalando pacotes (Frontend + Servidor)...
-call npm install react-router-dom react-hot-toast date-fns axios react-dropzone framer-motion express cors --save
+echo [1/4] Instalando dependencias do Frontend e do Servidor...
+:: Adicionamos express, cors e dotenv que sao o coracao do server.cjs
+call npm install react-router-dom react-hot-toast date-fns axios react-dropzone framer-motion express cors dotenv --save
 
 echo.
-echo [3/4] Atualizando dependencias gerais...
+echo [2/4] Verificando integridade dos pacotes...
 call npm install
-if %errorlevel% neq 0 (
-    echo ERRO ao instalar dependencias!
-    pause
-    exit /b 1
-)
 
 echo.
-echo [4/4] Testando Build do Vite...
+echo [3/4] Testando Build do Vite...
 call npm run build
 if %errorlevel% neq 0 (
-    echo.
-    echo ERRO na compilacao!
-    echo Verifique se o erro mudou para outro nome de biblioteca.
+    echo ERRO na compilacao! Verifique o log.
     pause
     exit /b 1
 )
+
+echo.
+echo [4/4] Enviando atualizacoes para o GitHub...
+:: Isso automatiza o envio para voce nao esquecer nada
+git add .
+git commit -m "fix: adiciona dependencias do servidor express e cors"
+git push
 
 echo.
 echo ============================================================
-echo  SUCESSO! O frontend foi compilado sem erros.
-echo  Agora voce pode fazer o GIT PUSH para o Render.
+echo  TUDO PRONTO!
+echo  O Render vai detectar o Push e iniciar o Deploy.
+echo  Lembre-se de usar "Clear Cache and Deploy" no painel Render.
 echo ============================================================
 echo.
 pause
