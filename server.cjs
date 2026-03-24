@@ -34,8 +34,8 @@ app.get(/^(?!\/api).+/, (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
-app.listen(PORT, () => {
-  console.log(`✅ MedDoc na porta ${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ MedDoc online em 0.0.0.0:${PORT}`);
   console.log(`   Supabase: ${process.env.VITE_SUPABASE_URL ? 'OK' : '⚠️  VITE_SUPABASE_URL não definida'}`);
-  console.log(`   /health : http://localhost:${PORT}/health`);
+  console.log(`   Health Check: /health`);
 });
