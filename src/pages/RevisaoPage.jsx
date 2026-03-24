@@ -1,237 +1,306 @@
 import { useState, useEffect, useCallback } from 'react'
-import { prontuariosService, storageService } from '../lib/storage'
+import { supabase } from '../lib/storage'  // ← CORRIGIDO
 import { useAuth } from '../hooks/useAuth'
 import { useAuditLog } from '../hooks/useAuditLog'
-import toast from 'react-hot-toast'
-import { PageHeader, BtnAccent, BtnSec, BtnDanger, EmptyState, Badge } from '../components/UI'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import styles from './RevisaoPage.module.css'
+import toast from 'react-hot-toast'
 
 export default function RevisaoPage() {
   const { user } = useAuth()
-  const log = useAuditLog()
+  const { log }  = useAuditLog()
 
-  const [queue, setQueue]         = useState([])
-  const [loading, setLoading]     = useState(true)
-  const [selected, setSelected]   = useState(null)
-  const [signedUrl, setSignedUrl] = useState(null)
-  const [decision, setDecision]   = useState(null) // 'approve' | 'reprove'
-  const [note, setNote]           = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError]         = useState('')
+  const [fila,    setFila]    = useState([])
+  const [loading, setLoading] = useState(false)
+  const [error,   setError]   = useState('')
 
-  const fetchQueue = useCallback(async () => {
+  // Prontuário sendo revisado
+  const [current,    setCurrent]    = useState(null)
+  const [fileUrl,    setFileUrl]    = useState('')
+  const [loadingUrl, setLoadingUrl] = useState(false)
+  const [obs,        setObs]        = useState('')
+  const [saving,     setSaving]     = useState(false)
+
+  /* ─── busca a fila de pendentes ─────────────────────────────────── */
+  const fetchFila = useCallback(async () => {
     setLoading(true)
-    const { data } = await prontuariosService.list({ status: 'pending', perPage: 100 })
-    setQueue(data || [])
-    setLoading(false)
+    setError('')
+    try {
+      const { data, error: err } = await supabase
+      .from('prontuarios')
+      .select('*, profiles(name, role)')  // ← CORRIGIDO: adicionar join com profiles
+      .eq('status', 'pending')            // ← CORRIGIDO: 'pending' em vez de 'pendente'
+      .order('created_at', { ascending: true }) // mais antigos primeiro
+
+      if (err) throw err
+        console.log('📋 Fila de revisão:', data?.length || 0)
+        setFila(data ?? [])
+    } catch (err) {
+      console.error('RevisaoPage fetchFila:', err)
+      setError('Não foi possível carregar a fila. Tente novamente.')
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
-  useEffect(() => { fetchQueue() }, [fetchQueue])
+  useEffect(() => {
+    fetchFila()
+  }, [fetchFila])
 
-  async function openItem(item) {
-    setSelected(item)
-    setDecision(null)
-    setNote('')
-    setError('')
-    setSignedUrl(null)
-    if (item.file_path) {
+  /* ─── abre um prontuário para revisão ────────────────────────────── */
+  async function openReview(row) {
+    setCurrent(row)
+    setObs('')
+    setFileUrl('')
+    if (row.file_path) {  // ← CORRIGIDO: file_path em vez de arquivo_path
+      setLoadingUrl(true)
       try {
-        const url = await storageService.getSignedUrl(item.file_path, 3600)
-        setSignedUrl(url)
-      } catch { /* sem arquivo */ }
+        const { data } = await supabase.storage
+        .from('prontuarios')
+        .createSignedUrl(row.file_path, 60 * 60)
+        setFileUrl(data?.signedUrl ?? '')
+      } catch {
+        setFileUrl('')
+      } finally {
+        setLoadingUrl(false)
+      }
     }
   }
 
-  function back() { setSelected(null); setSignedUrl(null) }
-
-  async function confirm() {
-    if (decision === 'reprove' && !note.trim()) {
-      setError('Informe o motivo da não liberação.')
-      return
-    }
-    setSubmitting(true)
-    try {
-      const newStatus = decision === 'approve' ? 'approved' : 'reproved'
-      await prontuariosService.updateStatus(selected.id, newStatus, note || null)
-      await log(
-        decision === 'approve' ? 'approved' : 'reproved',
-        `${decision === 'approve' ? 'Liberou' : 'Reprovou'} prontuário ${selected.record_number}`,
-        selected.id
-      )
-      toast.success(decision === 'approve' ? 'Prontuário liberado!' : 'Prontuário não liberado.')
-      setQueue(q => q.filter(i => i.id !== selected.id))
-      back()
-    } catch {
-      toast.error('Erro ao salvar decisão.')
-    } finally {
-      setSubmitting(false)
-    }
+  function closeReview() {
+    setCurrent(null)
+    setFileUrl('')
+    setObs('')
   }
 
-  // ── LISTA ──
-  if (!selected) return (
-    <div>
-      <PageHeader
-        title="Fila de revisão"
-        subtitle={`${queue.length} prontuário${queue.length !== 1 ? 's' : ''} aguardando`}
-      />
+  /* ─── decisão (aprovar / reprovar) ──────────────────────────────── */
+  async function decidir(novoStatus) {
+    if (!current) return
+      setSaving(true)
+      try {
+        const updateData = {
+          status: novoStatus,
+          reviewed_at: new Date().toISOString(),
+        }
 
-      {loading ? (
-        <div className={styles.loadingWrap}><span className="spinner dark" /></div>
-      ) : queue.length === 0 ? (
-        <div className={styles.emptyWrap}>
-          <EmptyState
-            icon={<svg fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>}
-            title="Fila vazia"
-            subtitle="Nenhum prontuário aguardando revisão."
-          />
-        </div>
-      ) : (
-        <div className={styles.list}>
-          {queue.map(item => (
-            <div key={item.id} className={styles.card} onClick={() => openItem(item)}>
-              <div className={styles.cardIcon}>
-                <svg fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
-                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
-                  <polyline points="14 2 14 8 20 8"/>
-                </svg>
-              </div>
-              <div className={styles.cardBody}>
-                <div className={styles.cardName}>{item.patient_name}</div>
-                <div className={styles.cardMeta}>
-                  {item.document_type} · Cód. {item.record_number} · {item.pages} pág. · Por <strong>{item.profiles?.name || '—'}</strong>
-                </div>
-              </div>
-              <div className={styles.cardRight}>
-                <div className={styles.cardTime}>
-                  {format(new Date(item.created_at), "dd/MM/yy 'às' HH:mm", { locale: ptBR })}
-                </div>
-                <Badge status="pending" />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
+        // Se tiver observação, adiciona
+        if (obs.trim()) {
+          updateData.review_note = obs.trim()
+        }
 
-  // ── DETALHE ──
+        const { error: err } = await supabase
+        .from('prontuarios')
+        .update(updateData)
+        .eq('id', current.id)
+
+        if (err) throw err
+
+          // Log de auditoria
+          await log('revisao', `Prontuário ${current.record_number} foi ${novoStatus === 'approved' ? 'aprovado' : 'reprovado'}`, current.id)
+
+          toast.success(novoStatus === 'approved' ? 'Prontuário aprovado!' : 'Prontuário reprovado.')
+          closeReview()
+          fetchFila() // atualiza a fila
+      } catch (err) {
+        console.error('RevisaoPage decidir:', err)
+        toast.error('Erro ao salvar revisão. Tente novamente.')
+      } finally {
+        setSaving(false)
+      }
+  }
+
+  /* ─── render ─────────────────────────────────────────────────────── */
   return (
-    <div>
-      <div style={{ marginBottom: 20 }}>
-        <BtnSec onClick={back}>
-          <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <path d="M19 12H5M12 5l-7 7 7 7"/>
-          </svg>
-          Voltar à fila
-        </BtnSec>
+    <div className="p-6 max-w-5xl mx-auto space-y-5">
+    <div className="flex items-center justify-between">
+    <h1 className="text-xl font-semibold text-gray-900">Fila de Revisão</h1>
+    <button
+    onClick={fetchFila}
+    disabled={loading}
+    className="text-sm text-blue-600 hover:text-blue-800 font-medium transition disabled:opacity-50"
+    >
+    ↻ Atualizar
+    </button>
+    </div>
+
+    {/* Erro */}
+    {error && (
+      <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+      {error}
+      </p>
+    )}
+
+    {/* Lista */}
+    {loading ? (
+      <div className="flex justify-center items-center py-20 text-sm text-gray-400">
+      Carregando fila…
+      </div>
+    ) : fila.length === 0 ? (
+      <div className="flex flex-col items-center justify-center py-20 text-center space-y-2">
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-gray-300" fill="none"
+      viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round"
+      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+      <p className="text-sm text-gray-400">Nenhum prontuário pendente de revisão.</p>
+      </div>
+    ) : (
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 text-xs font-medium text-gray-500 uppercase tracking-wider">
+      {fila.length} prontuário{fila.length !== 1 ? 's' : ''} aguardando
+      </div>
+      <ul className="divide-y divide-gray-50">
+      {fila.map(row => (
+        <li key={row.id}
+        className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition">
+        <div className="min-w-0">
+        <p className="text-sm font-medium text-gray-900 truncate">
+        {row.patient_name || '(sem nome)'}  {/* ← CORRIGIDO */}
+        </p>
+        <p className="text-xs text-gray-400 mt-0.5">
+        Nº {row.record_number || '—'} · {row.document_type || '—'} · enviado por {row.profiles?.name || '—'} ·{' '}
+        {row.created_at
+          ? format(new Date(row.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
+          : '—'}
+          </p>
+          </div>
+          <button
+          onClick={() => openReview(row)}
+          className="ml-4 flex-shrink-0 bg-blue-600 hover:bg-blue-700 text-white
+          text-xs font-medium px-3 py-1.5 rounded-lg transition"
+          >
+          Revisar
+          </button>
+          </li>
+      ))}
+      </ul>
+      </div>
+    )}
+
+    {/* Modal de revisão */}
+    {current && (
+      <div
+      className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+      onClick={closeReview}
+      >
+      <div
+      className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 space-y-4"
+      onClick={e => e.stopPropagation()}
+      >
+      <div className="flex items-start justify-between">
+      <h2 className="text-lg font-semibold text-gray-900">Revisar Prontuário</h2>
+      <button onClick={closeReview}
+      className="text-gray-400 hover:text-gray-600 transition text-xl leading-none">
+      ×
+      </button>
       </div>
 
-      {/* Header */}
-      <div className={styles.viewerHeader}>
-        <h2>{selected.patient_name}</h2>
-        <div className={styles.metaRow}>
-          <MetaItem label="Código"     value={selected.record_number} />
-          <MetaItem label="CPF"        value={selected.patient_cpf} />
-          <MetaItem label="Tipo"       value={selected.document_type} />
-          <MetaItem label="Enviado por" value={selected.profiles?.name || '—'} />
-          <MetaItem label="Data"       value={format(new Date(selected.created_at), 'dd/MM/yyyy', { locale: ptBR })} />
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+      <div>
+      <dt className="text-gray-500">Paciente</dt>
+      <dd className="font-medium text-gray-900">{current.patient_name || '—'}</dd>
+      </div>
+      <div>
+      <dt className="text-gray-500">CPF</dt>
+      <dd className="font-mono text-gray-900">{current.patient_cpf || '—'}</dd>
+      </div>
+      <div>
+      <dt className="text-gray-500">Número</dt>
+      <dd className="font-mono text-gray-900">{current.record_number || '—'}</dd>
+      </div>
+      <div>
+      <dt className="text-gray-500">Tipo</dt>
+      <dd className="text-gray-900">{current.document_type || '—'}</dd>
+      </div>
+      <div>
+      <dt className="text-gray-500">Páginas</dt>
+      <dd className="text-gray-900">{current.pages || '—'}</dd>
+      </div>
+      <div>
+      <dt className="text-gray-500">Enviado por</dt>
+      <dd className="text-gray-900">{current.profiles?.name || '—'}</dd>
+      </div>
+      <div className="col-span-2">
+      <dt className="text-gray-500">Enviado em</dt>
+      <dd className="text-gray-900">
+      {current.created_at
+        ? format(new Date(current.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
+        : '—'}
+        </dd>
         </div>
-        {selected.upload_note && (
-          <div className={styles.uploadNote}>
-            <strong>Obs. do operador:</strong> {selected.upload_note}
+        {current.upload_note && (
+          <div className="col-span-2">
+          <dt className="text-gray-500">Obs. do upload</dt>
+          <dd className="text-gray-900 whitespace-pre-wrap">{current.upload_note}</dd>
           </div>
         )}
-      </div>
+        </dl>
 
-      {/* File viewer */}
-      <div className={styles.fileCard}>
-        <div className={styles.fileCardHeader}>
-          <span>Arquivo do documento</span>
-          {signedUrl && (
-            <a href={signedUrl} target="_blank" rel="noreferrer" className={styles.openLink}>
-              Abrir em nova aba ↗
+        {/* Link para o arquivo */}
+        {current.file_path && (
+          <div>
+          {loadingUrl ? (
+            <span className="text-sm text-gray-400">Gerando link do arquivo…</span>
+          ) : fileUrl ? (
+            <a href={fileUrl} target="_blank" rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-sm text-blue-600
+            hover:text-blue-800 font-medium transition">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none"
+            viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round"
+            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round"
+            d="M2.458 12C3.732 7.943 7.523 5 12 5
+            c4.478 0 8.268 2.943 9.542 7
+            -1.274 4.057-5.064 7-9.542 7
+            -4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+            Abrir arquivo do prontuário
             </a>
-          )}
-        </div>
-        <div className={styles.filePreview}>
-          {!selected.file_path ? (
-            <p className={styles.noFile}>Nenhum arquivo enviado com este prontuário.</p>
-          ) : !signedUrl ? (
-            <div className={styles.loadingFile}><span className="spinner dark" /></div>
-          ) : selected.file_name?.endsWith('.pdf') ? (
-            <iframe src={signedUrl} title="Documento" className={styles.iframe} />
           ) : (
-            <img src={signedUrl} alt="Documento" className={styles.previewImg} />
+            <span className="text-sm text-gray-400">Arquivo não disponível.</span>
           )}
-        </div>
-      </div>
+          </div>
+        )}
 
-      {/* Decision */}
-      <div className={styles.decisionCard}>
-        <h3>Decisão de revisão</h3>
-        <div className={styles.decisionBtns}>
-          <button
-            className={`${styles.decisionBtn} ${styles.approve} ${decision === 'approve' ? styles.selected : ''}`}
-            onClick={() => { setDecision('approve'); setError('') }}
-          >
-            <svg fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
-            Liberar prontuário
-          </button>
-          <button
-            className={`${styles.decisionBtn} ${styles.reprove} ${decision === 'reprove' ? styles.selected : ''}`}
-            onClick={() => { setDecision('reprove'); setError('') }}
-          >
-            <svg fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            Não liberar
-          </button>
+        {/* Observações */}
+        <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+        Observações da revisão (opcional)
+        </label>
+        <textarea
+        rows={3}
+        value={obs}
+        onChange={e => setObs(e.target.value)}
+        placeholder="Justificativa da decisão, pendências…"
+        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm
+        focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+        resize-none"
+        />
         </div>
 
-        {decision === 'approve' && (
-          <div className={styles.noteArea}>
-            <label>Comentário de aprovação (opcional)</label>
-            <textarea
-              placeholder="Adicione uma observação sobre a liberação…"
-              value={note}
-              onChange={e => setNote(e.target.value)}
-              className={styles.textarea}
-            />
-          </div>
-        )}
-
-        {decision === 'reprove' && (
-          <div className={styles.noteArea}>
-            <label>Motivo da não liberação <span className={styles.req}>*</span></label>
-            <textarea
-              placeholder="Descreva o motivo pelo qual este prontuário não pode ser liberado…"
-              value={note}
-              onChange={e => { setNote(e.target.value); setError('') }}
-              className={styles.textarea}
-            />
-            {error && <span className={styles.errMsg}>{error}</span>}
-          </div>
-        )}
-
-        {decision && (
-          <div className={styles.confirmRow}>
-            <BtnAccent onClick={confirm} disabled={submitting}>
-              {submitting ? <span className="spinner" /> : null}
-              {submitting ? 'Salvando…' : 'Confirmar decisão'}
-            </BtnAccent>
-            <BtnSec onClick={() => { setDecision(null); setNote(''); setError('') }}>Cancelar</BtnSec>
-          </div>
-        )}
-      </div>
+        {/* Botões de decisão */}
+        <div className="flex gap-3 pt-1">
+        <button
+        onClick={() => decidir('reproved')}  // ← CORRIGIDO
+        disabled={saving}
+        className="flex-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200
+        text-sm font-medium py-2 rounded-lg transition disabled:opacity-50"
+        >
+        {saving ? '…' : '✕ Reprovar'}
+        </button>
+        <button
+        onClick={() => decidir('approved')}  // ← CORRIGIDO
+        disabled={saving}
+        className="flex-1 bg-green-600 hover:bg-green-700 text-white
+        text-sm font-medium py-2 rounded-lg transition disabled:opacity-50"
+        >
+        {saving ? '…' : '✓ Aprovar'}
+        </button>
+        </div>
+        </div>
+        </div>
+    )}
     </div>
-  )
-}
-
-function MetaItem({ label, value }) {
-  return (
-    <span className={styles.metaItem}>
-      <strong>{label}:</strong> {value}
-    </span>
   )
 }

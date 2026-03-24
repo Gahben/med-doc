@@ -1,217 +1,344 @@
 import { useState, useEffect, useCallback } from 'react'
-import { prontuariosService, storageService } from '../lib/storage'
-import { useAuth } from '../hooks/useAuth'
-import { useAuditLog } from '../hooks/useAuditLog'
+import { supabase, prontuariosService } from '../lib/storage'  // ← CORRIGIDO
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import toast from 'react-hot-toast'
-import {
-  PageHeader, BtnAccent, BtnSec, BtnDanger,
-  Badge, EmptyState, LoadingRows, Modal, Field, Input, Select
-} from '../components/UI'
-import styles from './BuscaPage.module.css'
 
-const DOC_TYPES = ['Todos', 'Prontuário médico', 'Exame laboratorial', 'Laudo de imagem', 'Receituário', 'Declaração / atestado', 'Outro']
-const STATUS_OPTS = [
-  { value: '', label: 'Todos os status' },
-  { value: 'pending',  label: 'Aguardando' },
-  { value: 'approved', label: 'Liberado' },
-  { value: 'reproved', label: 'Não liberado' },
-]
+const PAGE_SIZE = 20
+
+const STATUS_LABEL = {
+  pending:  { label: 'Pendente',  color: 'bg-yellow-100 text-yellow-800' },
+  approved: { label: 'Aprovado',  color: 'bg-green-100 text-green-800'  },
+  reproved: { label: 'Reprovado', color: 'bg-red-100 text-red-800'    },
+}
 
 export default function BuscaPage() {
-  const { profile } = useAuth()
-  const log = useAuditLog()
+  const [query,   setQuery]   = useState('')
+  const [status,  setStatus]  = useState('')
+  const [page,    setPage]    = useState(0)
+  const [rows,    setRows]    = useState([])
+  const [total,   setTotal]   = useState(0)
+  const [loading, setLoading] = useState(false)
+  const [error,   setError]   = useState('')
 
-  const [rows, setRows]     = useState([])
-  const [total, setTotal]   = useState(0)
-  const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
-  const [status, setStatus] = useState('')
-  const [page, setPage]     = useState(1)
-  const PER_PAGE = 20
-
+  // Modal de detalhe
   const [selected, setSelected] = useState(null)
-  const [signedUrl, setSignedUrl] = useState(null)
-  const [loadingUrl, setLoadingUrl] = useState(false)
+  const [fileUrl,  setFileUrl]  = useState('')
 
-  const fetch = useCallback(async () => {
+  /* ─── busca ─────────────────────────────────────────────────────── */
+  const fetchProntuarios = useCallback(async () => {
     setLoading(true)
-    const { data, count, error } = await prontuariosService.list({ search, status: status || null, page, perPage: PER_PAGE })
-    if (!error) { setRows(data || []); setTotal(count || 0) }
-    setLoading(false)
-  }, [search, status, page])
+    setError('')
+    try {
+      // Monta a query base
+      let q = supabase
+      .from('prontuarios')
+      .select('*, profiles(name, role)', { count: 'exact' })  // ← CORRIGIDO: incluir profiles
+      .order('created_at', { ascending: false })
+      .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1)
 
-  useEffect(() => { fetch() }, [fetch])
-
-  // Debounce search
-  useEffect(() => {
-    const t = setTimeout(() => { setPage(1); fetch() }, 350)
-    return () => clearTimeout(t)
-  }, [search])
-
-  async function openModal(row) {
-    setSelected(row)
-    setSignedUrl(null)
-    if (row.file_path) {
-      setLoadingUrl(true)
-      try {
-        const url = await storageService.getSignedUrl(row.file_path, 3600)
-        setSignedUrl(url)
-        await log('download', `Visualizou prontuário ${row.record_number}`, row.id)
-      } catch {
-        toast.error('Erro ao gerar link de acesso ao arquivo.')
-      } finally {
-        setLoadingUrl(false)
+      // Filtro de texto (nome do paciente ou número) - CORRIGIDO nomes das colunas
+      if (query.trim()) {
+        q = q.or(
+          `patient_name.ilike.%${query.trim()}%,record_number.ilike.%${query.trim()}%`
+        )
       }
+
+      // Filtro de status
+      if (status && status !== 'todos') {
+        q = q.eq('status', status)
+      }
+
+      const { data, count, error: err } = await q
+
+      if (err) throw err
+
+        console.log('📋 Prontuários encontrados:', data?.length || 0)
+        setRows(data ?? [])
+        setTotal(count ?? 0)
+    } catch (err) {
+      console.error('BuscaPage fetchProntuarios:', err)
+      setError('Não foi possível carregar os prontuários. Tente novamente.')
+    } finally {
+      setLoading(false)
+    }
+  }, [query, status, page])
+
+  // Executa ao montar e quando os filtros/página mudam
+  useEffect(() => {
+    fetchProntuarios()
+  }, [fetchProntuarios])
+
+  // Quando o filtro muda, volta para a primeira página
+  function handleFilterChange(field, value) {
+    setPage(0)
+    if (field === 'query')  setQuery(value)
+      if (field === 'status') setStatus(value)
+  }
+
+  /* ─── modal de detalhe ──────────────────────────────────────────── */
+  async function openDetail(row) {
+    setSelected(row)
+    setFileUrl('')
+    if (row.file_path) {  // ← CORRIGIDO: file_path ao invés de arquivo_path
+      const { data } = await supabase.storage
+      .from('prontuarios')
+      .createSignedUrl(row.file_path, 60 * 60) // 1 hora
+      setFileUrl(data?.signedUrl ?? '')
     }
   }
 
-  async function handlePrint() {
-    if (!selected) return
-    await log('print', `Imprimiu prontuário ${selected.record_number}`, selected.id)
-    window.open(signedUrl, '_blank')
+  function closeDetail() {
+    setSelected(null)
+    setFileUrl('')
   }
 
-  const totalPages = Math.ceil(total / PER_PAGE)
-  const canReview = profile?.role === 'admin' || profile?.role === 'revisor'
+  /* ─── render ─────────────────────────────────────────────────────── */
+  const totalPages = Math.ceil(total / PAGE_SIZE)
 
   return (
-    <div>
-      <PageHeader
-        title="Busca de Prontuários"
-        subtitle={`${total} registro${total !== 1 ? 's' : ''} encontrado${total !== 1 ? 's' : ''}`}
-      />
+    <div className="p-6 max-w-6xl mx-auto space-y-5">
+    <h1 className="text-xl font-semibold text-gray-900">Busca de Prontuários</h1>
 
-      {/* Search bar */}
-      <div className={styles.searchBar}>
-        <div className={styles.searchWrap}>
-          <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          </svg>
-          <input
-            className={styles.searchInput}
-            placeholder="Buscar por nome, CPF ou número do prontuário…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-        </div>
-        <select
-          className={styles.filterSelect}
-          value={status}
-          onChange={e => { setStatus(e.target.value); setPage(1) }}
-        >
-          {STATUS_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
+    {/* Filtros */}
+    <div className="flex flex-wrap gap-3">
+    <input
+    type="text"
+    placeholder="Paciente ou número do prontuário…"
+    value={query}
+    onChange={e => handleFilterChange('query', e.target.value)}
+    className="flex-1 min-w-[220px] rounded-lg border border-gray-300 px-3 py-2 text-sm
+    focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+    />
+    <select
+    value={status}
+    onChange={e => handleFilterChange('status', e.target.value)}
+    className="rounded-lg border border-gray-300 px-3 py-2 text-sm
+    focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+    >
+    <option value="">Todos os status</option>
+    <option value="pending">Pendente</option>
+    <option value="approved">Aprovado</option>
+    <option value="reproved">Reprovado</option>
+    </select>
+    <button
+    onClick={fetchProntuarios}
+    className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium
+    px-4 py-2 rounded-lg transition"
+    >
+    Buscar
+    </button>
+    </div>
+
+    {/* Erro */}
+    {error && (
+      <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+      {error}
+      </p>
+    )}
+
+    {/* Tabela */}
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    {loading ? (
+      <div className="flex justify-center items-center py-20 text-sm text-gray-400">
+      Carregando…
+      </div>
+    ) : rows.length === 0 ? (
+      <div className="flex justify-center items-center py-20 text-sm text-gray-400">
+      Nenhum prontuário encontrado.
+      </div>
+    ) : (
+      <table className="w-full text-sm">
+      <thead>
+      <tr className="border-b border-gray-100 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+      <th className="px-4 py-3">Paciente</th>
+      <th className="px-4 py-3">Número</th>
+      <th className="px-4 py-3">Tipo</th>
+      <th className="px-4 py-3">Data</th>
+      <th className="px-4 py-3">Status</th>
+      <th className="px-4 py-3">Enviado por</th>
+      <th className="px-4 py-3"></th>
+      </tr>
+      </thead>
+      <tbody className="divide-y divide-gray-50">
+      {rows.map(row => (
+        <tr key={row.id} className="hover:bg-gray-50 transition">
+        <td className="px-4 py-3 font-medium text-gray-900">
+        {row.patient_name || '—'}
+        </td>
+        <td className="px-4 py-3 text-gray-600 font-mono">
+        {row.record_number || '—'}
+        </td>
+        <td className="px-4 py-3 text-gray-500">
+        {row.document_type || '—'}
+        </td>
+        <td className="px-4 py-3 text-gray-500">
+        {row.document_date
+          ? format(new Date(row.document_date), "dd/MM/yyyy", { locale: ptBR })
+          : '—'}
+          </td>
+          <td className="px-4 py-3">
+          {row.status ? (
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+              ${STATUS_LABEL[row.status]?.color ?? 'bg-gray-100 text-gray-600'}`}>
+              {STATUS_LABEL[row.status]?.label ?? row.status}
+              </span>
+          ) : '—'}
+          </td>
+          <td className="px-4 py-3 text-gray-500">
+          {row.profiles?.name || '—'}
+          </td>
+          <td className="px-4 py-3 text-right">
+          <button
+          onClick={() => openDetail(row)}
+          className="text-blue-600 hover:text-blue-800 text-xs font-medium transition"
+          >
+          Ver detalhe
+          </button>
+          </td>
+          </tr>
+      ))}
+      </tbody>
+      </table>
+    )}
+    </div>
+
+    {/* Paginação */}
+    {totalPages > 1 && (
+      <div className="flex items-center justify-between text-sm text-gray-500">
+      <span>{total} registro{total !== 1 ? 's' : ''} encontrado{total !== 1 ? 's' : ''}</span>
+      <div className="flex gap-2">
+      <button
+      onClick={() => setPage(p => Math.max(0, p - 1))}
+      disabled={page === 0}
+      className="px-3 py-1.5 rounded-lg border border-gray-200 hover:border-gray-300
+      disabled:opacity-40 disabled:cursor-not-allowed transition"
+      >
+      ← Anterior
+      </button>
+      <span className="px-3 py-1.5">
+      {page + 1} / {totalPages}
+      </span>
+      <button
+      onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+      disabled={page >= totalPages - 1}
+      className="px-3 py-1.5 rounded-lg border border-gray-200 hover:border-gray-300
+      disabled:opacity-40 disabled:cursor-not-allowed transition"
+      >
+      Próxima →
+      </button>
+      </div>
+      </div>
+    )}
+
+    {/* Modal de detalhe */}
+    {selected && (
+      <div
+      className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+      onClick={closeDetail}
+      >
+      <div
+      className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 space-y-4"
+      onClick={e => e.stopPropagation()}
+      >
+      <div className="flex items-start justify-between">
+      <h2 className="text-lg font-semibold text-gray-900">Detalhe do Prontuário</h2>
+      <button onClick={closeDetail} className="text-gray-400 hover:text-gray-600 transition text-xl leading-none">×</button>
       </div>
 
-      {/* Table */}
-      <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th>Paciente</th>
-              <th>Prontuário</th>
-              <th>CPF</th>
-              <th>Tipo</th>
-              <th>Status</th>
-              <th>Data</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <LoadingRows cols={7} rows={8} />
-            ) : rows.length === 0 ? (
-              <tr>
-                <td colSpan={7}>
-                  <EmptyState
-                    icon={<svg fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>}
-                    title="Nenhum prontuário encontrado"
-                    subtitle="Tente ajustar os filtros ou o termo de busca."
-                  />
-                </td>
-              </tr>
-            ) : rows.map(row => (
-              <tr key={row.id} onClick={() => openModal(row)} className={styles.tableRow}>
-                <td className={styles.tdName}>{row.patient_name}</td>
-                <td className={styles.tdCode}>{row.record_number}</td>
-                <td className={styles.tdCode}>{row.patient_cpf}</td>
-                <td className={styles.tdMuted}>{row.document_type}</td>
-                <td><Badge status={row.locked ? 'locked' : row.status} /></td>
-                <td className={styles.tdDate}>
-                  {row.created_at
-                    ? format(new Date(row.created_at), 'dd/MM/yyyy', { locale: ptBR })
-                    : '—'}
-                </td>
-                <td>
-                  <div className={styles.rowActions}>
-                    <button className={styles.iconBtn} title="Ver detalhes" onClick={e => { e.stopPropagation(); openModal(row) }}>
-                      <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+      <div>
+      <dt className="text-gray-500">Paciente</dt>
+      <dd className="font-medium text-gray-900">{selected.patient_name || '—'}</dd>
       </div>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className={styles.pagination}>
-          <BtnSec small disabled={page <= 1} onClick={() => setPage(p => p - 1)}>← Anterior</BtnSec>
-          <span className={styles.pageInfo}>Página {page} de {totalPages}</span>
-          <BtnSec small disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Próxima →</BtnSec>
+      <div>
+      <dt className="text-gray-500">CPF</dt>
+      <dd className="font-mono text-gray-900">{selected.patient_cpf || '—'}</dd>
+      </div>
+      <div>
+      <dt className="text-gray-500">Número</dt>
+      <dd className="font-mono text-gray-900">{selected.record_number || '—'}</dd>
+      </div>
+      <div>
+      <dt className="text-gray-500">Tipo</dt>
+      <dd className="text-gray-900">{selected.document_type || '—'}</dd>
+      </div>
+      <div>
+      <dt className="text-gray-500">Status</dt>
+      <dd>
+      {selected.status ? (
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+          ${STATUS_LABEL[selected.status]?.color ?? 'bg-gray-100 text-gray-600'}`}>
+          {STATUS_LABEL[selected.status]?.label ?? selected.status}
+          </span>
+      ) : '—'}
+      </dd>
+      </div>
+      <div>
+      <dt className="text-gray-500">Data do doc.</dt>
+      <dd className="text-gray-900">
+      {selected.document_date
+        ? format(new Date(selected.document_date), "dd/MM/yyyy", { locale: ptBR })
+        : '—'}
+        </dd>
         </div>
-      )}
-
-      {/* Detail Modal */}
-      <Modal open={!!selected} onClose={() => setSelected(null)} title="Detalhes do Prontuário" width={560}>
-        {selected && (
-          <div>
-            <div className={styles.detailGrid}>
-              <DetailItem label="Paciente"       value={selected.patient_name} />
-              <DetailItem label="CPF"            value={selected.patient_cpf} />
-              <DetailItem label="Número"         value={selected.record_number} />
-              <DetailItem label="Tipo"           value={selected.document_type} />
-              <DetailItem label="Status"         value={<Badge status={selected.status} />} />
-              <DetailItem label="Data do doc."   value={selected.document_date || '—'} />
-              <DetailItem label="Enviado por"    value={selected.profiles?.name || '—'} />
-              <DetailItem label="Páginas"        value={selected.pages} />
-              {selected.upload_note && (
-                <DetailItem label="Obs. upload" value={selected.upload_note} full />
-              )}
-              {selected.review_note && (
-                <DetailItem label="Obs. revisão" value={selected.review_note} full />
-              )}
-            </div>
-
-            <div className={styles.modalActions}>
-              {selected.file_path && (
-                <BtnAccent onClick={handlePrint} disabled={loadingUrl || !signedUrl}>
-                  {loadingUrl ? <span className="spinner" /> : (
-                    <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-                    </svg>
-                  )}
-                  {loadingUrl ? 'Carregando…' : 'Abrir arquivo'}
-                </BtnAccent>
-              )}
-              <BtnSec onClick={() => setSelected(null)}>Fechar</BtnSec>
-            </div>
+        <div>
+        <dt className="text-gray-500">Páginas</dt>
+        <dd className="text-gray-900">{selected.pages || '—'}</dd>
+        </div>
+        <div>
+        <dt className="text-gray-500">Enviado por</dt>
+        <dd className="text-gray-900">{selected.profiles?.name || '—'}</dd>
+        </div>
+        {selected.upload_note && (
+          <div className="col-span-2">
+          <dt className="text-gray-500">Obs. do upload</dt>
+          <dd className="text-gray-900 whitespace-pre-wrap">{selected.upload_note}</dd>
           </div>
         )}
-      </Modal>
-    </div>
-  )
-}
+        {selected.review_note && (
+          <div className="col-span-2">
+          <dt className="text-gray-500">Obs. da revisão</dt>
+          <dd className="text-gray-900 whitespace-pre-wrap">{selected.review_note}</dd>
+          </div>
+        )}
+        </dl>
 
-function DetailItem({ label, value, full }) {
-  return (
-    <div className={`${styles.detailItem} ${full ? styles.full : ''}`}>
-      <span className={styles.detailLabel}>{label}</span>
-      <span className={styles.detailValue}>{value}</span>
+        {selected.file_path && (
+          <div className="pt-2">
+          {fileUrl ? (
+            <a
+            href={fileUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-sm text-blue-600
+            hover:text-blue-800 font-medium transition"
+            >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none"
+            viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round"
+            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1
+            m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Visualizar arquivo
+            </a>
+          ) : (
+            <span className="text-sm text-gray-400">Gerando link…</span>
+          )}
+          </div>
+        )}
+
+        <div className="pt-2 flex justify-end">
+        <button
+        onClick={closeDetail}
+        className="px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-700
+        hover:border-gray-300 transition"
+        >
+        Fechar
+        </button>
+        </div>
+        </div>
+        </div>
+    )}
     </div>
   )
 }
