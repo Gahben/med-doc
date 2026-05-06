@@ -27,7 +27,7 @@ export default function RevisaoPage() {
     try {
       const { data, error: err } = await supabase
         .from('prontuarios')
-        .select('*, profiles(name, role)')
+        .select('*, profiles!prontuarios_uploaded_by_fkey(name, role)')
         .eq('status', 'pending')
         .order('created_at', { ascending: true })
       if (err) throw err

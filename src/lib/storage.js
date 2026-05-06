@@ -50,7 +50,7 @@ export const prontuariosService = {
   list: ({ search = '', status = null, page = 1, perPage = 20 } = {}) => {
     let query = supabase
       .from('prontuarios')
-      .select('*, profiles!uploaded_by(name, role)', { count: 'exact' })
+      .select('*, profiles!prontuarios_uploaded_by_fkey(name, role)', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range((page - 1) * perPage, page * perPage - 1)
 
@@ -66,7 +66,7 @@ export const prontuariosService = {
   getById: (id) =>
     supabase
       .from('prontuarios')
-      .select('*, profiles!uploaded_by(name, role)')
+      .select('*, profiles!prontuarios_uploaded_by_fkey(name, role)')
       .eq('id', id)
       .single(),
 
@@ -229,7 +229,7 @@ export const workflowService = {
   listByWorkflow: (workflowStatus) =>
     supabase
       .from('prontuarios')
-      .select('*, profiles!uploaded_by(name, role)')
+      .select('*, profiles!prontuarios_uploaded_by_fkey(name, role)')
       .eq('workflow_status', workflowStatus)
       .order('updated_at', { ascending: false }),
 }

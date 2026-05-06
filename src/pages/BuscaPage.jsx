@@ -26,7 +26,7 @@ export default function BuscaPage() {
     try {
       let q = supabase
         .from('prontuarios')
-        .select('*, profiles(name, role)', { count: 'exact' })
+        .select('*, profiles!prontuarios_uploaded_by_fkey(name, role)', { count: 'exact' })
         .neq('status', 'trash')  // exclui lixeira explicitamente
         .order('created_at', { ascending: false })
         .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1)
