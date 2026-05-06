@@ -1,165 +1,252 @@
-.loadingWrap, .emptyWrap {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 300px;
-}
-
-.list { display: flex; flex-direction: column; gap: 12px; }
-
-.card {
+.btnRefresh {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 20px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text2);
   cursor: pointer;
-  transition: all 0.12s;
-}
-.card:hover {
-  border-color: var(--accent);
-  box-shadow: 0 2px 8px rgba(29,92,58,0.08);
-}
-
-.cardIcon {
-  width: 44px; height: 44px;
-  background: var(--warning-light);
-  border-radius: 10px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  color: var(--warning);
+  gap: 6px;
+  transition: background 0.12s;
 }
-.cardIcon svg { width: 20px; height: 20px; }
+.btnRefresh:hover:not(:disabled) { background: var(--surface2); }
+.btnRefresh:disabled { opacity: 0.5; cursor: not-allowed; }
+.btnRefresh svg { width: 14px; height: 14px; }
 
-.cardBody { flex: 1; min-width: 0; }
-.cardName { font-weight: 600; font-size: 15px; }
-.cardMeta { font-size: 13px; color: var(--text2); margin-top: 3px; }
-
-.cardRight { text-align: right; flex-shrink: 0; }
-.cardTime { font-size: 12px; color: var(--text3); margin-bottom: 6px; }
-
-/* ─── Viewer ─── */
-.viewerHeader {
-  background: var(--surface);
-  border: 1px solid var(--border);
+.errorBox {
+  background: var(--danger-light);
+  border: 1px solid rgba(192,57,43,0.2);
   border-radius: var(--radius);
-  padding: 20px 24px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--danger);
   margin-bottom: 16px;
 }
-.viewerHeader h2 { font-size: 18px; font-weight: 600; margin-bottom: 10px; }
-.metaRow { display: flex; gap: 20px; flex-wrap: wrap; }
-.metaItem { font-size: 13px; color: var(--text2); }
-.metaItem strong { color: var(--text); }
 
-.uploadNote {
-  margin-top: 12px;
-  padding: 10px 14px;
-  background: var(--warning-light);
-  border-radius: 8px;
-  font-size: 13px;
-  color: var(--warning);
-  border-left: 3px solid var(--warning);
+.loadingState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 60px;
+  font-size: 14px;
+  color: var(--text3);
 }
 
-.fileCard {
+.tableCard {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
-  margin-bottom: 16px;
 }
-.fileCardHeader {
-  padding: 14px 20px;
+
+.tableHeader {
+  padding: 10px 16px;
   border-bottom: 1px solid var(--border);
   background: var(--surface2);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+}
+
+.filaList { list-style: none; }
+
+.filaItem {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  gap: 16px;
+  transition: background 0.1s;
+}
+.filaItem:last-child { border-bottom: none; }
+.filaItem:hover { background: var(--surface2); }
+
+.filaInfo { min-width: 0; }
+
+.filaName {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.filaMeta {
+  font-size: 12px;
+  color: var(--text3);
+  margin-top: 3px;
+}
+
+.btnRevisar {
+  flex-shrink: 0;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.12s;
+}
+.btnRevisar:hover { opacity: 0.88; }
+
+/* ─── MODAL ────────────────────────────────────────────────── */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 16px;
+  animation: fadeIn 0.15s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.modal {
+  background: var(--surface);
+  border-radius: 14px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.15);
+  width: 100%;
+  max-width: 520px;
+  animation: slideUp 0.2s cubic-bezier(0.22,1,0.36,1);
+  overflow: hidden;
+}
+@keyframes slideUp {
+  from { transform: translateY(12px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.modalHeader h3 { font-size: 16px; font-weight: 600; }
+
+.modalClose {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text3);
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  transition: color 0.12s;
+}
+.modalClose:hover { color: var(--text); }
+.modalClose svg { width: 18px; height: 18px; }
+
+.modalBody { padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
+
+.detailGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.detailGrid dt {
+  font-size: 11px;
+  color: var(--text3);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 3px;
+}
+.detailGrid dd { font-size: 14px; color: var(--text); }
+
+.colSpan2 { grid-column: 1 / -1; }
+.mono { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; }
+.preWrap { white-space: pre-wrap; }
+
+.fileSection {
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.linkBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--accent);
+  transition: opacity 0.12s;
+}
+.linkBtn:hover { opacity: 0.75; }
+.linkBtn svg { width: 15px; height: 15px; }
+
+.loadingText { font-size: 13px; color: var(--text3); }
+
+.obsField { display: flex; flex-direction: column; gap: 6px; }
+
+.obsLabel {
   font-size: 13px;
   font-weight: 500;
   color: var(--text2);
 }
-.openLink { font-size: 13px; color: var(--accent); }
-.openLink:hover { text-decoration: underline; }
-
-.filePreview { min-height: 200px; display: flex; align-items: center; justify-content: center; }
-.noFile { color: var(--text3); font-size: 14px; }
-.loadingFile { padding: 40px; }
-
-.iframe { width: 100%; height: 480px; border: none; display: block; }
-.previewImg { max-width: 100%; max-height: 480px; display: block; margin: 0 auto; padding: 16px; }
-
-/* ─── Decision ─── */
-.decisionCard {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 24px;
-}
-.decisionCard h3 { font-size: 15px; font-weight: 600; margin-bottom: 16px; }
-
-.decisionBtns { display: flex; gap: 10px; margin-bottom: 16px; }
-
-.decisionBtn {
-  flex: 1;
-  border-radius: 8px;
-  padding: 12px;
-  font-size: 14px;
-  font-weight: 500;
-  font-family: inherit;
-  cursor: pointer;
-  border: 2px solid transparent;
-  transition: all 0.15s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-.decisionBtn svg { width: 16px; height: 16px; }
-
-.approve {
-  background: var(--accent-light);
-  color: var(--accent);
-}
-.approve.selected, .approve:hover {
-  background: var(--accent);
-  color: #fff;
-  border-color: var(--accent);
-}
-
-.reprove {
-  background: var(--danger-light);
-  color: var(--danger);
-}
-.reprove.selected, .reprove:hover {
-  background: var(--danger);
-  color: #fff;
-  border-color: var(--danger);
-}
-
-.noteArea { margin-bottom: 16px; }
-.noteArea label { display: block; font-size: 13px; font-weight: 500; color: var(--text2); margin-bottom: 6px; }
-.req { color: var(--danger); }
 
 .textarea {
-  width: 100%;
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 10px 14px;
   font-size: 14px;
-  font-family: inherit;
-  min-height: 90px;
+  background: var(--surface);
+  color: var(--text);
   resize: vertical;
   outline: none;
   transition: border-color 0.15s;
-  color: var(--text);
+  min-height: 80px;
+  font-family: inherit;
 }
 .textarea:focus { border-color: var(--accent); }
+.textarea::placeholder { color: var(--text3); }
 
-.errMsg { font-size: 12px; color: var(--danger); margin-top: 4px; display: block; }
+.modalFooter {
+  display: flex;
+  gap: 10px;
+  padding: 14px 24px 20px;
+  border-top: 1px solid var(--border);
+}
 
-.confirmRow { display: flex; gap: 8px; }
+.btnReprovar {
+  flex: 1;
+  background: var(--danger-light);
+  border: 1px solid rgba(192,57,43,0.25);
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--danger);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.btnReprovar:hover:not(:disabled) { background: #fad5d3; }
+.btnReprovar:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btnAprovar {
+  flex: 1;
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+  cursor: pointer;
+  transition: opacity 0.12s;
+}
+.btnAprovar:hover:not(:disabled) { opacity: 0.88; }
+.btnAprovar:disabled { opacity: 0.5; cursor: not-allowed; }

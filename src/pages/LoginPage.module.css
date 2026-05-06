@@ -1,127 +1,335 @@
+/* ─── PAGE LAYOUT ────────────────────────────────────────────── */
 .page {
   min-height: 100vh;
   display: flex;
+  position: relative;
+  overflow: hidden;
+  background: #f8f7f4;
+}
+
+/* Background orbs */
+.bgOrb1 {
+  position: fixed;
+  top: -120px;
+  right: -80px;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(29,92,58,0.08) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+.bgOrb2 {
+  position: fixed;
+  bottom: -100px;
+  left: 30%;
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(200,131,42,0.07) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ─── LEFT BRAND PANEL ───────────────────────────────────────── */
+.brandPanel {
+  width: 45%;
+  background: var(--accent);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 56px 52px;
+  position: relative;
+  overflow: hidden;
+}
+
+.brandPanel::before {
+  content: '';
+  position: absolute;
+  top: -60px;
+  right: -60px;
+  width: 280px;
+  height: 280px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.05);
+}
+.brandPanel::after {
+  content: '';
+  position: absolute;
+  bottom: -40px;
+  left: -40px;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.04);
+}
+
+.brandContent {
+  position: relative;
+  z-index: 1;
+}
+
+.brandLogoWrap {
+  width: 64px;
+  height: 64px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 18px;
+  display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg);
-  padding: 24px;
+  margin-bottom: 32px;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255,255,255,0.2);
+}
+.brandLogoWrap svg {
+  width: 32px;
+  height: 32px;
+  color: white;
+  stroke: white;
+}
+
+.brandName {
+  font-size: 36px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.5px;
+  margin-bottom: 12px;
+}
+
+.brandTagline {
+  font-size: 16px;
+  color: rgba(255,255,255,0.75);
+  line-height: 1.6;
+  margin-bottom: 48px;
+  max-width: 300px;
+}
+
+.featureList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.featureItem {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 14px;
+  color: rgba(255,255,255,0.85);
+}
+
+.featureDot {
+  width: 8px;
+  height: 8px;
+  background: rgba(255,255,255,0.5);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.brandFooter {
+  position: relative;
+  z-index: 1;
+  font-size: 12px;
+  color: rgba(255,255,255,0.45);
+}
+
+/* ─── RIGHT FORM PANEL ───────────────────────────────────────── */
+.formPanel {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 40px;
+  position: relative;
+  z-index: 1;
 }
 
 .card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 48px 44px;
   width: 100%;
   max-width: 400px;
-  box-shadow: var(--shadow);
-  animation: fadeIn 0.22s ease;
+  animation: slideUp 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
-.logo {
-  font-weight: 600;
-  font-size: 20px;
-  display: flex;
+/* Mobile logo (hidden on desktop) */
+.mobileLogoRow {
+  display: none;
   align-items: center;
-  justify-content: center;
   gap: 10px;
-  margin-bottom: 32px;
+  margin-bottom: 28px;
 }
-
-.logoMark {
-  width: 32px;
-  height: 32px;
+.mobileLogoMark {
+  width: 36px;
+  height: 36px;
   background: var(--accent);
-  border-radius: 8px;
+  border-radius: 9px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-.logoMark svg { width: 16px; height: 16px; }
-
-.card h2 {
-  font-size: 22px;
-  font-weight: 600;
-  margin-bottom: 6px;
-  text-align: center;
+.mobileLogoMark svg { width: 18px; height: 18px; stroke: white; }
+.mobileLogoText {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.3px;
 }
 
-.card p {
+.cardTitle {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.4px;
+  margin-bottom: 8px;
+}
+
+.cardSubtitle {
   font-size: 14px;
   color: var(--text2);
-  margin-bottom: 24px;
-  text-align: center;
+  margin-bottom: 36px;
+  line-height: 1.5;
 }
 
-.demoPills {
+/* ─── FORM ───────────────────────────────────────────────────── */
+.form {
   display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-bottom: 20px;
-  justify-content: center;
+  flex-direction: column;
+  gap: 20px;
 }
 
-.demoPill {
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  padding: 4px 14px;
-  font-size: 12px;
-  color: var(--text2);
-  cursor: pointer;
-  transition: all 0.12s;
-}
-.demoPill:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: var(--accent-light);
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
 }
 
-.field { margin-bottom: 16px; }
-
-.field label {
-  display: block;
+.label {
   font-size: 13px;
-  font-weight: 500;
-  margin-bottom: 6px;
-  color: var(--text2);
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.1px;
 }
 
-.field input {
+.inputWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.inputIconLeft {
+  position: absolute;
+  left: 14px;
+  color: var(--text3);
+  display: flex;
+  pointer-events: none;
+}
+.inputIconLeft svg { width: 16px; height: 16px; }
+
+.input {
   width: 100%;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 11px 14px 11px 42px;
   font-size: 14px;
   background: var(--surface);
   color: var(--text);
   outline: none;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
-.field input:focus { border-color: var(--accent); }
+.input::placeholder { color: var(--text3); }
+.input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+.inputPad { padding-right: 44px; }
 
-.btnPrimary {
+.eyeBtn {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text3);
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  border-radius: 6px;
+  transition: color 0.12s;
+}
+.eyeBtn:hover { color: var(--text2); }
+.eyeBtn svg { width: 16px; height: 16px; }
+
+/* ─── ERROR ──────────────────────────────────────────────────── */
+.errorBox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--danger-light);
+  border: 1px solid rgba(192,57,43,0.2);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--danger);
+}
+
+/* ─── SUBMIT BUTTON ──────────────────────────────────────────── */
+.submitBtn {
   width: 100%;
   background: var(--accent);
   color: #fff;
   border: none;
-  border-radius: 8px;
-  padding: 11px;
+  border-radius: 10px;
+  padding: 13px 20px;
   font-size: 15px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  margin-top: 8px;
-  transition: opacity 0.15s;
+  margin-top: 4px;
+  transition: all 0.15s;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 44px;
+  min-height: 48px;
+  letter-spacing: 0.1px;
 }
-.btnPrimary:hover:not(:disabled) { opacity: 0.88; }
-.btnPrimary:disabled { opacity: 0.6; cursor: not-allowed; }
+.submitBtn:hover:not(:disabled) {
+  background: #174d30;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(29,92,58,0.3);
+}
+.submitBtn:active:not(:disabled) { transform: translateY(0); }
+.submitBtn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* ─── SECURITY NOTE ──────────────────────────────────────────── */
+.secNote {
+  margin-top: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text3);
+}
+
+/* ─── SPINNER ────────────────────────────────────────────────── */
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  display: inline-block;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── RESPONSIVE ─────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .page { flex-direction: column; }
+  .brandPanel { display: none; }
+  .formPanel { padding: 40px 24px; align-items: flex-start; padding-top: 60px; }
+  .mobileLogoRow { display: flex; }
+}
