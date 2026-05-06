@@ -9,7 +9,7 @@ import { PageHeader, EmptyState } from '../components/UI'
 import styles from './RevisaoPage.module.css'
 
 export default function RevisaoPage() {
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const { log }  = useAuditLog()
 
   const [fila,       setFila]       = useState([])
@@ -39,7 +39,7 @@ export default function RevisaoPage() {
     }
   }, [])
 
-  useEffect(() => { fetchFila() }, [fetchFila])
+  useEffect(() => { if (!authLoading && user) fetchFila() }, [fetchFila, authLoading, user])
 
   async function openReview(row) {
     setCurrent(row)

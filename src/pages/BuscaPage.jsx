@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase, prontuariosService } from '../lib/storage'
+import { useAuth } from '../hooks/useAuth'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { PageHeader, Badge, EmptyState, LoadingRows } from '../components/UI'
@@ -8,6 +9,7 @@ import styles from './BuscaPage.module.css'
 const PAGE_SIZE = 20
 
 export default function BuscaPage() {
+  const { user, loading: authLoading } = useAuth()
   const [query,    setQuery]    = useState('')
   const [status,   setStatus]   = useState('')
   const [page,     setPage]     = useState(0)
@@ -47,7 +49,7 @@ export default function BuscaPage() {
     }
   }, [query, status, page])
 
-  useEffect(() => { fetchProntuarios() }, [fetchProntuarios])
+  useEffect(() => { if (!authLoading && user) fetchProntuarios() }, [fetchProntuarios, authLoading, user])
 
   function handleFilterChange(field, value) {
     setPage(0)
