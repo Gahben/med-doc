@@ -71,6 +71,8 @@ export default function RevisaoPage() {
       const updateData = {
         status: novoStatus,
         reviewed_at: new Date().toISOString(),
+        reviewed_by: user.id,
+        workflow_status: novoStatus === 'approved' ? 'in_production' : null,
         ...(obs.trim() ? { review_note: obs.trim() } : {}),
       }
       const { error: err } = await supabase
@@ -78,12 +80,12 @@ export default function RevisaoPage() {
         .update(updateData)
         .eq('id', current.id)
       if (err) throw err
-      await log('revisao', `Prontuário ${current.record_number} foi ${novoStatus === 'approved' ? 'aprovado' : 'reprovado'}`, current.id)
-      toast.success(novoStatus === 'approved' ? 'Prontuário aprovado!' : 'Prontuário reprovado.')
+      await log('auditoria', `Prontuário ${current.record_number} foi ${novoStatus === 'approved' ? 'aprovado' : 'reprovado'} pelo auditor`, current.id)
+      toast.success(novoStatus === 'approved' ? 'Prontuário aprovado! Status de fluxo atualizado para Em produção.' : 'Prontuário reprovado.')
       closeReview()
       fetchFila()
     } catch {
-      toast.error('Erro ao salvar revisão. Tente novamente.')
+      toast.error('Erro ao salvar auditoria. Tente novamente.')
     } finally {
       setSaving(false)
     }
@@ -92,8 +94,8 @@ export default function RevisaoPage() {
   return (
     <div>
       <PageHeader
-        title="Fila de Revisão"
-        subtitle="Prontuários aguardando liberação"
+        title="Fila de Auditoria"
+        subtitle="Prontuários aguardando liberação pelo auditor"
         actions={
           <button onClick={fetchFila} disabled={loading} className={styles.btnRefresh}>
             <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -151,7 +153,7 @@ export default function RevisaoPage() {
         <div className={styles.overlay} onClick={closeReview}>
           <div className={styles.modal} onClick={e => e.stopPropagation()}>
             <div className={styles.modalHeader}>
-              <h3>Revisar Prontuário</h3>
+              <h3>Auditar Prontuário</h3>
               <button onClick={closeReview} className={styles.modalClose}>
                 <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -200,7 +202,7 @@ export default function RevisaoPage() {
               )}
 
               <div className={styles.obsField}>
-                <label className={styles.obsLabel}>Observações da revisão (opcional)</label>
+                <label className={styles.obsLabel}>Observações da auditoria (opcional)</label>
                 <textarea
                   rows={3}
                   value={obs}

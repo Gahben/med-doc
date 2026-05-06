@@ -131,12 +131,22 @@ export default function AdminPage() {
 
       {/* Stats */}
       <div className={styles.statsGrid}>
-        <StatCard value={S(stats?.total)}       label="Total de prontuários"    color="accent"  />
-        <StatCard value={S(stats?.pending)}      label="Aguardando revisão"      color="warning" />
-        <StatCard value={S(stats?.approved)}     label="Liberados"               color="accent"  />
-        <StatCard value={S(stats?.reproved)}     label="Não liberados"           color="danger"  />
-        <StatCard value={S(stats?.active_users)} label="Usuários ativos"         color="info"    />
-        <StatCard value={S(stats?.logs_24h)}     label="Eventos nas últimas 24h" color="purple"  />
+        <StatCard value={S(stats?.total)}                  label="Total de prontuários"    color="accent"  />
+        <StatCard value={S(stats?.pending)}                 label="Aguardando auditoria"    color="warning" />
+        <StatCard value={S(stats?.approved)}                label="Liberados"               color="accent"  />
+        <StatCard value={S(stats?.reproved)}                label="Não liberados"           color="danger"  />
+        <StatCard value={S(stats?.active_users)}            label="Usuários ativos"         color="info"    />
+        <StatCard value={S(stats?.logs_24h)}                label="Eventos nas últimas 24h" color="purple"  />
+      </div>
+
+      {/* Workflow stats */}
+      <h2 className={styles.sectionTitle} style={{ marginTop: 24, marginBottom: 12 }}>Fluxo de Solicitações</h2>
+      <div className={styles.statsGrid}>
+        <StatCard value={S(stats?.workflow_received)}       label="Solicitações recebidas"   color="info"    />
+        <StatCard value={S(stats?.workflow_in_production)}  label="Em produção"               color="warning" />
+        <StatCard value={S(stats?.workflow_in_audit)}       label="Em auditoria"              color="purple"  />
+        <StatCard value={S(stats?.workflow_delivered)}      label="Entregues"                 color="accent"  />
+        <StatCard value={S(stats?.pending_reviewer_notes)}  label="Notas pendentes (revisor)" color="danger"  />
       </div>
 
       {/* Users table */}
@@ -239,7 +249,8 @@ export default function AdminPage() {
           <Field label="Nível de acesso">
             <Select value={inviteRole} onChange={e => setInviteRole(e.target.value)}>
               <option value="operador">Operador — faz upload de prontuários</option>
-              <option value="revisor">Revisor — aprova ou reprova prontuários</option>
+              <option value="revisor">Revisor — valida solicitações e contata pacientes</option>
+              <option value="auditor">Auditor — aprova ou reprova documentos</option>
               <option value="admin">Admin — acesso total ao sistema</option>
             </Select>
           </Field>
@@ -267,6 +278,7 @@ export default function AdminPage() {
               <Select value={editRole} onChange={e => setEditRole(e.target.value)}>
                 <option value="operador">Operador</option>
                 <option value="revisor">Revisor</option>
+                <option value="auditor">Auditor</option>
                 <option value="admin">Admin</option>
               </Select>
             </Field>

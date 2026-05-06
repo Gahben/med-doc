@@ -16,7 +16,7 @@ const Icons = {
   file:   <svg fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>,
 }
 
-const roleBadgeClass = { admin: 'admin', revisor: 'revisor', operador: 'operador' }
+const roleBadgeClass = { admin: 'admin', auditor: 'auditor', revisor: 'revisor', operador: 'operador' }
 
 export default function Layout() {
   const { profile, signOut } = useAuth()
@@ -25,7 +25,8 @@ export default function Layout() {
   const [pendingCount, setPendingCount] = useState(0)
 
   useEffect(() => {
-    if (profile?.role === 'admin' || profile?.role === 'revisor') {
+    // Auditores veem a fila de revisão de documentos; revisores não (recebem via sistema externo)
+    if (profile?.role === 'admin' || profile?.role === 'auditor') {
       prontuariosService.list({ status: 'pending', perPage: 1 }).then(({ count }) => {
         if (count) setPendingCount(count)
       })
@@ -39,7 +40,7 @@ export default function Layout() {
   }
 
   const canUpload  = profile?.role === 'admin' || profile?.role === 'operador'
-  const canReview  = profile?.role === 'admin' || profile?.role === 'revisor'
+  const canAudit   = profile?.role === 'admin' || profile?.role === 'auditor'
   const isAdmin    = profile?.role === 'admin'
 
   return (
@@ -73,13 +74,13 @@ export default function Layout() {
               {Icons.upload} Upload
             </NavLink>
           )}
-          {canReview && (
+          {canAudit && (
             <NavLink to="/revisao" className={({ isActive }) => `${styles.sidebarItem} ${isActive ? styles.active : ''}`}>
-              {Icons.review} Revisão
+              {Icons.review} Auditoria
               {pendingCount > 0 && <span className={styles.sidebarBadge}>{pendingCount}</span>}
             </NavLink>
           )}
-          {canReview && (
+          {canAudit && (
             <>
               <span className={styles.sidebarLabel}>Auditoria</span>
               <NavLink to="/logs" className={({ isActive }) => `${styles.sidebarItem} ${isActive ? styles.active : ''}`}>

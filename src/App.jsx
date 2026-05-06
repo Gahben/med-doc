@@ -40,10 +40,10 @@ export default function App() {
           <RequireAuth roles={['admin', 'operador']}><UploadPage /></RequireAuth>
         } />
         <Route path="revisao" element={
-          <RequireAuth roles={['admin', 'revisor']}><RevisaoPage /></RequireAuth>
+          <RequireAuth roles={['admin', 'auditor']}><RevisaoPage /></RequireAuth>
         } />
         <Route path="logs" element={
-          <RequireAuth roles={['admin', 'revisor']}><LogsPage /></RequireAuth>
+          <RequireAuth roles={['admin', 'auditor']}><LogsPage /></RequireAuth>
         } />
         <Route path="lixeira" element={
           <RequireAuth roles={['admin']}><LixeiraPage /></RequireAuth>

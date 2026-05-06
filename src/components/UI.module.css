@@ -62,7 +62,8 @@
 .badgeLocked   { background: #e8eaf6; color: #3949ab; }
 
 .roleAdmin    { background: #e8eaf6; color: #3949ab; }
-.roleRevisor  { background: var(--purple-light); color: var(--purple); }
+.roleAuditor  { background: var(--purple-light); color: var(--purple); }
+.roleRevisor  { background: #e8f5e9; color: #2e7d32; }
 .roleOperador { background: var(--accent-light); color: var(--accent); }
 
 /* ─── CARD ─── */

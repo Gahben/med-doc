@@ -63,13 +63,21 @@ export function Badge({ status }) {
   return <span className={`${styles.badge} ${b.cls}`}>{b.label}</span>
 }
 
+const ROLE_LABELS = {
+  admin:    'admin',
+  auditor:  'auditor',
+  revisor:  'revisor',
+  operador: 'operador',
+}
+
 export function RoleBadge({ role }) {
   const map = {
     admin:    styles.roleAdmin,
+    auditor:  styles.roleAuditor,
     revisor:  styles.roleRevisor,
     operador: styles.roleOperador,
   }
-  return <span className={`${styles.badge} ${map[role] || ''}`}>{role}</span>
+  return <span className={`${styles.badge} ${map[role] || ''}`}>{ROLE_LABELS[role] || role}</span>
 }
 
 export function Card({ children, className }) {

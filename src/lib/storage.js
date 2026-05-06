@@ -180,3 +180,56 @@ export const profilesService = {
       body: { action, target_user_id: targetUserId, ...params },
     }),
 }
+
+// ─── NOTAS DO REVISOR ────────────────────────────────────────────────────────
+// Comunicação interna entre revisor e operador sobre pendências de solicitação
+
+export const reviewerNotesService = {
+  listByProntuario: (prontuarioId) =>
+    supabase
+      .from('reviewer_notes')
+      .select('*, profiles!author_id(name, role)')
+      .eq('prontuario_id', prontuarioId)
+      .order('created_at', { ascending: false }),
+
+  listPending: () =>
+    supabase
+      .from('reviewer_notes')
+      .select('*, profiles!author_id(name, role), prontuarios(patient_name, record_number)')
+      .eq('resolved', false)
+      .order('created_at', { ascending: false }),
+
+  create: (prontuarioId, noteText, noteType = 'info') =>
+    supabase.from('reviewer_notes').insert({
+      prontuario_id: prontuarioId,
+      note_text: noteText,
+      note_type: noteType,
+    }),
+
+  resolve: (id) =>
+    supabase.from('reviewer_notes').update({ resolved: true }).eq('id', id),
+}
+
+// ─── WORKFLOW (integração com sistema externo via edge function) ──────────────
+// O sistema externo (portal do solicitante) atualiza workflow_status via edge function.
+// Este serviço permite que operadores e revisores consultem e atualizem o status interno.
+
+export const workflowService = {
+  // Atualiza o workflow_status de um prontuário
+  // Usado pelo operador (in_production, delivered) e pelo auditor (in_audit)
+  updateStatus: (prontuarioId, workflowStatus) =>
+    supabase
+      .from('prontuarios')
+      .update({ workflow_status: workflowStatus })
+      .eq('id', prontuarioId)
+      .select()
+      .single(),
+
+  // Lista prontuários por workflow_status (para o operador acompanhar o fluxo)
+  listByWorkflow: (workflowStatus) =>
+    supabase
+      .from('prontuarios')
+      .select('*, profiles!uploaded_by(name, role)')
+      .eq('workflow_status', workflowStatus)
+      .order('updated_at', { ascending: false }),
+}
