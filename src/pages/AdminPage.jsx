@@ -1,72 +1,111 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase, profilesService } from '../lib/storage'
+import { useAuth } from '../hooks/useAuth'
 import { useAuditLog } from '../hooks/useAuditLog'
 import toast from 'react-hot-toast'
-import { PageHeader, BtnAccent, BtnSec, RoleBadge, Modal, Field, Input, Select, Card } from '../components/UI'
+import { PageHeader, BtnAccent, BtnSec, RoleBadge, Modal, Field, Input, Select } from '../components/UI'
 import styles from './AdminPage.module.css'
 
 export default function AdminPage() {
+  const { user } = useAuth()
   const log = useAuditLog()
-  const [stats, setStats]   = useState(null)
-  const [users, setUsers]   = useState([])
+  const [stats,   setStats]   = useState(null)
+  const [users,   setUsers]   = useState([])
   const [loading, setLoading] = useState(true)
 
-  const [showInvite, setShowInvite]   = useState(false)
+  // Invite
+  const [showInvite,  setShowInvite]  = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteRole, setInviteRole]   = useState('operador')
-  const [inviting, setInviting]       = useState(false)
+  const [inviteName,  setInviteName]  = useState('')
+  const [inviteRole,  setInviteRole]  = useState('operador')
+  const [inviting,    setInviting]    = useState(false)
 
-  const [editUser, setEditUser]     = useState(null)
-  const [editRole, setEditRole]     = useState('')
+  // Edit user
+  const [editUser,   setEditUser]   = useState(null)
+  const [editRole,   setEditRole]   = useState('')
   const [editActive, setEditActive] = useState(true)
-  const [saving, setSaving]         = useState(false)
+  const [saving,     setSaving]     = useState(false)
 
-  useEffect(() => {
-    async function load() {
-      const [{ data: s }, { data: u }] = await Promise.all([
-        supabase.from('dashboard_stats').select('*').single(),
-        profilesService.list(),
-      ])
-      setStats(s)
-      setUsers(u || [])
-      setLoading(false)
-    }
-    load()
+  // Confirm delete
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting,     setDeleting]     = useState(false)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const [{ data: s }, { data: u }] = await Promise.all([
+      supabase.from('dashboard_stats').select('*').single(),
+      profilesService.list(),
+    ])
+    setStats(s)
+    setUsers(u || [])
+    setLoading(false)
   }, [])
 
+  useEffect(() => { load() }, [load])
+
+  // ── CONVIDAR ────────────────────────────────────────────────
   async function handleInvite(e) {
     e.preventDefault()
-    if (!inviteEmail) { toast.error('Informe o e-mail.'); return }
     setInviting(true)
     try {
-      const { error } = await supabase.auth.admin.inviteUserByEmail(inviteEmail, {
-        data: { role: inviteRole },
-      })
-      if (error) throw error
+      const { data, error } = await profilesService.invite(inviteEmail, inviteRole, inviteName)
+      if (error) throw new Error(error.message || 'Erro ao convidar')
       toast.success(`Convite enviado para ${inviteEmail}`)
       setShowInvite(false)
       setInviteEmail('')
+      setInviteName('')
+      load()
     } catch (err) {
-      // Admin API só disponível server-side; orientar o uso de Edge Function
-      toast.error('Use a Edge Function "invite-user" ou convide pelo painel do Supabase.')
-      console.error(err)
+      toast.error(err.message)
     } finally {
       setInviting(false)
     }
   }
 
+  // ── EDITAR ROLE / ATIVO ─────────────────────────────────────
   async function saveEdit() {
     setSaving(true)
     try {
-      const { data } = await profilesService.update(editUser.id, { role: editRole, active: editActive })
+      const { error } = await profilesService.adminAction('update_role', editUser.id, {
+        role: editRole,
+        active: editActive,
+      })
+      if (error) throw new Error(error.message)
       setUsers(u => u.map(x => x.id === editUser.id ? { ...x, role: editRole, active: editActive } : x))
-      await log('login', `Alterou perfil de ${editUser.name}: role=${editRole}`)
       toast.success('Usuário atualizado.')
       setEditUser(null)
-    } catch {
-      toast.error('Erro ao salvar.')
+    } catch (err) {
+      toast.error(err.message || 'Erro ao salvar.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  // ── RESET SENHA ─────────────────────────────────────────────
+  async function handleResetPassword(u) {
+    try {
+      const { error } = await profilesService.adminAction('reset_password', u.id)
+      if (error) throw new Error(error.message)
+      toast.success(`E-mail de redefinição enviado para ${u.email || u.name}`)
+    } catch (err) {
+      toast.error(err.message || 'Erro ao enviar reset.')
+    }
+  }
+
+  // ── EXCLUIR ─────────────────────────────────────────────────
+  async function handleDelete() {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      const { error } = await profilesService.adminAction('delete_user', deleteTarget.id)
+      if (error) throw new Error(error.message)
+      setUsers(u => u.filter(x => x.id !== deleteTarget.id))
+      toast.success(`Usuário "${deleteTarget.name}" excluído.`)
+      setDeleteTarget(null)
+    } catch (err) {
+      toast.error(err.message || 'Erro ao excluir.')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -80,8 +119,10 @@ export default function AdminPage() {
         actions={
           <BtnAccent onClick={() => setShowInvite(true)}>
             <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/>
-              <line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>
+              <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <line x1="19" y1="8" x2="19" y2="14"/>
+              <line x1="22" y1="11" x2="16" y2="11"/>
             </svg>
             Convidar usuário
           </BtnAccent>
@@ -90,21 +131,32 @@ export default function AdminPage() {
 
       {/* Stats */}
       <div className={styles.statsGrid}>
-        <StatCard value={S(stats?.total)}    label="Total de prontuários" color="accent" />
-        <StatCard value={S(stats?.pending)}   label="Aguardando revisão"   color="warning" />
-        <StatCard value={S(stats?.approved)}  label="Liberados"            color="accent" />
-        <StatCard value={S(stats?.reproved)}  label="Não liberados"        color="danger" />
-        <StatCard value={S(stats?.active_users)} label="Usuários ativos"  color="info" />
-        <StatCard value={S(stats?.logs_24h)}  label="Eventos nas últimas 24h" color="purple" />
+        <StatCard value={S(stats?.total)}       label="Total de prontuários"    color="accent"  />
+        <StatCard value={S(stats?.pending)}      label="Aguardando revisão"      color="warning" />
+        <StatCard value={S(stats?.approved)}     label="Liberados"               color="accent"  />
+        <StatCard value={S(stats?.reproved)}     label="Não liberados"           color="danger"  />
+        <StatCard value={S(stats?.active_users)} label="Usuários ativos"         color="info"    />
+        <StatCard value={S(stats?.logs_24h)}     label="Eventos nas últimas 24h" color="purple"  />
       </div>
 
       {/* Users table */}
-      <h2 className={styles.sectionTitle}>Usuários</h2>
+      <div className={styles.sectionHeader}>
+        <h2 className={styles.sectionTitle}>Usuários</h2>
+        <button onClick={load} className={styles.btnRefresh} disabled={loading}>
+          <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <polyline points="23 4 23 10 17 10"/>
+            <path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/>
+          </svg>
+          Atualizar
+        </button>
+      </div>
+
       <div className={styles.tableWrap}>
         <table className={styles.table}>
           <thead>
             <tr>
               <th>Nome</th>
+              <th>E-mail</th>
               <th>Role</th>
               <th>Status</th>
               <th>Criado em</th>
@@ -113,8 +165,9 @@ export default function AdminPage() {
           </thead>
           <tbody>
             {users.map(u => (
-              <tr key={u.id} className={styles.row}>
+              <tr key={u.id} className={`${styles.row} ${!u.active ? styles.rowInactive : ''}`}>
                 <td className={styles.tdName}>{u.name}</td>
+                <td className={styles.tdEmail}>{u.email || '—'}</td>
                 <td><RoleBadge role={u.role} /></td>
                 <td>
                   <span className={u.active ? styles.badgeActive : styles.badgeInactive}>
@@ -125,9 +178,38 @@ export default function AdminPage() {
                   {new Date(u.created_at).toLocaleDateString('pt-BR')}
                 </td>
                 <td>
-                  <BtnSec small onClick={() => { setEditUser(u); setEditRole(u.role); setEditActive(u.active) }}>
-                    Editar
-                  </BtnSec>
+                  {/* Não mostra ações sobre o próprio usuário logado */}
+                  {u.id !== user?.id ? (
+                    <div className={styles.actionBtns}>
+                      <BtnSec small onClick={() => { setEditUser(u); setEditRole(u.role); setEditActive(u.active) }}>
+                        Editar
+                      </BtnSec>
+                      <button
+                        className={styles.btnIconWarn}
+                        title="Enviar reset de senha"
+                        onClick={() => handleResetPassword(u)}
+                      >
+                        <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                          <path d="M7 11V7a5 5 0 0110 0v4"/>
+                        </svg>
+                      </button>
+                      <button
+                        className={styles.btnIconDanger}
+                        title="Excluir usuário"
+                        onClick={() => setDeleteTarget(u)}
+                      >
+                        <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                          <polyline points="3 6 5 6 21 6"/>
+                          <path d="M19 6l-1 14H6L5 6"/>
+                          <path d="M10 11v6M14 11v6"/>
+                          <path d="M9 6V4h6v2"/>
+                        </svg>
+                      </button>
+                    </div>
+                  ) : (
+                    <span className={styles.youBadge}>Você</span>
+                  )}
                 </td>
               </tr>
             ))}
@@ -135,30 +217,38 @@ export default function AdminPage() {
         </table>
       </div>
 
-      {/* Invite Modal */}
-      <Modal open={showInvite} onClose={() => setShowInvite(false)} title="Convidar usuário" width={420}>
+      {/* ── MODAL: Convidar ── */}
+      <Modal open={showInvite} onClose={() => setShowInvite(false)} title="Convidar usuário" width={440}>
         <form onSubmit={handleInvite}>
+          <Field label="Nome (opcional)">
+            <Input
+              placeholder="Ex.: Maria Silva"
+              value={inviteName}
+              onChange={e => setInviteName(e.target.value)}
+            />
+          </Field>
           <Field label="E-mail" required>
             <Input
               type="email"
               placeholder="usuario@empresa.com"
               value={inviteEmail}
               onChange={e => setInviteEmail(e.target.value)}
+              required
             />
           </Field>
-          <Field label="Role">
+          <Field label="Nível de acesso">
             <Select value={inviteRole} onChange={e => setInviteRole(e.target.value)}>
-              <option value="operador">Operador</option>
-              <option value="revisor">Revisor</option>
-              <option value="admin">Admin</option>
+              <option value="operador">Operador — faz upload de prontuários</option>
+              <option value="revisor">Revisor — aprova ou reprova prontuários</option>
+              <option value="admin">Admin — acesso total ao sistema</option>
             </Select>
           </Field>
           <p className={styles.inviteNote}>
-            💡 O convite por API Admin exige uma Edge Function. Como alternativa, convide pelo painel do Supabase em <em>Auth → Users → Invite user</em> e depois atualize o role aqui.
+            O usuário receberá um e-mail com link para criar a senha. O role será aplicado automaticamente.
           </p>
-          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+          <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
             <BtnAccent type="submit" disabled={inviting}>
-              {inviting ? <span className="spinner" /> : null}
+              {inviting && <span className="spinner" />}
               {inviting ? 'Enviando…' : 'Enviar convite'}
             </BtnAccent>
             <BtnSec type="button" onClick={() => setShowInvite(false)}>Cancelar</BtnSec>
@@ -166,18 +256,21 @@ export default function AdminPage() {
         </form>
       </Modal>
 
-      {/* Edit user Modal */}
-      <Modal open={!!editUser} onClose={() => setEditUser(null)} title="Editar usuário" width={380}>
+      {/* ── MODAL: Editar usuário ── */}
+      <Modal open={!!editUser} onClose={() => setEditUser(null)} title="Editar usuário" width={400}>
         {editUser && (
           <div>
             <p className={styles.editName}>{editUser.name}</p>
-            <Field label="Role">
+            {editUser.email && <p className={styles.editEmail}>{editUser.email}</p>}
+
+            <Field label="Nível de acesso">
               <Select value={editRole} onChange={e => setEditRole(e.target.value)}>
                 <option value="operador">Operador</option>
                 <option value="revisor">Revisor</option>
                 <option value="admin">Admin</option>
               </Select>
             </Field>
+
             <div className={styles.toggleRow}>
               <div>
                 <label>Usuário ativo</label>
@@ -188,12 +281,34 @@ export default function AdminPage() {
                 <span className={styles.toggleSlider} />
               </label>
             </div>
+
             <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
               <BtnAccent onClick={saveEdit} disabled={saving}>
-                {saving ? <span className="spinner" /> : null}
+                {saving && <span className="spinner" />}
                 {saving ? 'Salvando…' : 'Salvar'}
               </BtnAccent>
               <BtnSec onClick={() => setEditUser(null)} disabled={saving}>Cancelar</BtnSec>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* ── MODAL: Confirmar exclusão ── */}
+      <Modal open={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Excluir usuário" width={400}>
+        {deleteTarget && (
+          <div>
+            <p className={styles.deleteWarning}>
+              Tem certeza que deseja excluir permanentemente o usuário{' '}
+              <strong>{deleteTarget.name}</strong>?
+            </p>
+            <p className={styles.deleteNote}>
+              Esta ação não pode ser desfeita. Os prontuários enviados por este usuário serão preservados.
+            </p>
+            <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+              <button onClick={handleDelete} disabled={deleting} className={styles.btnDeleteConfirm}>
+                {deleting ? 'Excluindo…' : 'Sim, excluir'}
+              </button>
+              <BtnSec onClick={() => setDeleteTarget(null)} disabled={deleting}>Cancelar</BtnSec>
             </div>
           </div>
         )}
@@ -204,11 +319,11 @@ export default function AdminPage() {
 
 function StatCard({ value, label, color }) {
   const colorMap = {
-    accent:  { val: 'var(--accent)',   bg: 'var(--accent-light)' },
-    warning: { val: 'var(--warning)',  bg: 'var(--warning-light)' },
-    danger:  { val: 'var(--danger)',   bg: 'var(--danger-light)' },
-    info:    { val: 'var(--info)',     bg: 'var(--info-light)' },
-    purple:  { val: 'var(--purple)',   bg: 'var(--purple-light)' },
+    accent:  { val: 'var(--accent)',  bg: 'var(--accent-light)'  },
+    warning: { val: 'var(--warning)', bg: 'var(--warning-light)' },
+    danger:  { val: 'var(--danger)',  bg: 'var(--danger-light)'  },
+    info:    { val: 'var(--info)',    bg: 'var(--info-light)'    },
+    purple:  { val: 'var(--purple)',  bg: 'var(--purple-light)'  },
   }
   const c = colorMap[color] || colorMap.accent
   return (

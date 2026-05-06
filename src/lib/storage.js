@@ -1,15 +1,10 @@
 /**
  * storage.js — Abstração de banco de dados / storage
- *
- * Para trocar do Supabase para outro provider (Firebase, Appwrite, PocketBase, etc.),
- * basta reimplementar as funções exportadas aqui. O resto do app não muda.
- *
- * Provider atual: Supabase (plano gratuito — 500 MB DB + 1 GB Storage)
+ * Provider atual: Supabase
  */
-
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseUrl     = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 if (!supabaseUrl || !supabaseAnonKey) {
@@ -21,7 +16,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-// ─── AUTH ───────────────────────────────────────────────────────────────────
+// ─── AUTH ────────────────────────────────────────────────────────────────────
 
 export const authService = {
   signIn: (email, password) =>
@@ -49,13 +44,13 @@ export const authService = {
     supabase.auth.onAuthStateChange(callback),
 }
 
-// ─── PRONTUÁRIOS ────────────────────────────────────────────────────────────
+// ─── PRONTUÁRIOS ─────────────────────────────────────────────────────────────
 
 export const prontuariosService = {
   list: ({ search = '', status = null, page = 1, perPage = 20 } = {}) => {
     let query = supabase
       .from('prontuarios')
-      .select('*, profiles(name, role)', { count: 'exact' })
+      .select('*, profiles!uploaded_by(name, role)', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range((page - 1) * perPage, page * perPage - 1)
 
@@ -65,24 +60,38 @@ export const prontuariosService = {
       )
     }
     if (status) query = query.eq('status', status)
-
     return query
   },
 
   getById: (id) =>
     supabase
       .from('prontuarios')
-      .select('*, profiles(name, role)')
+      .select('*, profiles!uploaded_by(name, role)')
       .eq('id', id)
       .single(),
 
-  create: (data) =>
-    supabase.from('prontuarios').insert(data).select().single(),
+  // FIX: insert separado do select para não colidir com RLS de operadores
+  create: async (data) => {
+    const { error: insertError } = await supabase
+      .from('prontuarios')
+      .insert(data)
+    if (insertError) return { data: null, error: insertError }
+
+    return supabase
+      .from('prontuarios')
+      .select('*')
+      .eq('record_number', data.record_number)
+      .single()
+  },
 
   updateStatus: (id, status, reviewNote = null) =>
     supabase
       .from('prontuarios')
-      .update({ status, review_note: reviewNote, reviewed_at: new Date().toISOString() })
+      .update({
+        status,
+        review_note: reviewNote,
+        reviewed_at: new Date().toISOString(),
+      })
       .eq('id', id)
       .select()
       .single(),
@@ -106,10 +115,6 @@ export const prontuariosService = {
 // ─── STORAGE (arquivos) ──────────────────────────────────────────────────────
 
 export const storageService = {
-  /**
-   * Faz upload de arquivo para o bucket 'prontuarios'
-   * Para trocar de provider, reimplemente apenas esta função.
-   */
   upload: async (file, path) => {
     const { data, error } = await supabase.storage
       .from('prontuarios')
@@ -140,7 +145,7 @@ export const logsService = {
   list: ({ type = null, page = 1, perPage = 50 } = {}) => {
     let query = supabase
       .from('audit_logs')
-      .select('*, profiles(name)', { count: 'exact' })
+      .select('*, profiles!user_id(name, role)', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range((page - 1) * perPage, page * perPage - 1)
 
@@ -163,7 +168,15 @@ export const profilesService = {
   update: (id, data) =>
     supabase.from('profiles').update(data).eq('id', id).select().single(),
 
-  // Cria usuário via Admin API (apenas para admins — use Edge Function no Supabase)
-  invite: (email, role) =>
-    supabase.functions.invoke('invite-user', { body: { email, role } }),
+  // Convida usuário via Edge Function (só admins)
+  invite: (email, role, name = '') =>
+    supabase.functions.invoke('invite-user', {
+      body: { email, role, name },
+    }),
+
+  // Ações administrativas via Edge Function (reset senha, excluir, mudar role)
+  adminAction: (action, targetUserId, params = {}) =>
+    supabase.functions.invoke('admin-actions', {
+      body: { action, target_user_id: targetUserId, ...params },
+    }),
 }

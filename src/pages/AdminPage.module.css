@@ -130,3 +130,121 @@
 }
 .toggle input:checked + .toggleSlider { background: var(--accent); }
 .toggle input:checked + .toggleSlider::before { transform: translateX(16px); }
+
+/* ── Adições para gestão completa de usuários ── */
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.btnRefresh {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  color: var(--text2);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.12s;
+}
+.btnRefresh:hover:not(:disabled) { background: var(--surface2); }
+.btnRefresh:disabled { opacity: 0.5; cursor: not-allowed; }
+.btnRefresh svg { width: 13px; height: 13px; }
+
+.rowInactive td { opacity: 0.5; }
+
+.tdEmail {
+  font-size: 13px;
+  color: var(--text3);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actionBtns {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btnIconWarn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 5px;
+  cursor: pointer;
+  color: var(--warning);
+  display: flex;
+  align-items: center;
+  transition: background 0.12s;
+}
+.btnIconWarn:hover { background: var(--warning-light); }
+.btnIconWarn svg { width: 14px; height: 14px; }
+
+.btnIconDanger {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 5px;
+  cursor: pointer;
+  color: var(--danger);
+  display: flex;
+  align-items: center;
+  transition: background 0.12s;
+}
+.btnIconDanger:hover { background: var(--danger-light); }
+.btnIconDanger svg { width: 14px; height: 14px; }
+
+.youBadge {
+  font-size: 11px;
+  background: var(--accent-light);
+  color: var(--accent);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-weight: 600;
+}
+
+.editEmail {
+  font-size: 13px;
+  color: var(--text3);
+  margin-top: -8px;
+  margin-bottom: 16px;
+}
+
+.deleteWarning {
+  font-size: 15px;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.deleteNote {
+  font-size: 13px;
+  color: var(--text3);
+}
+
+.btnDeleteConfirm {
+  background: var(--danger);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 18px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.12s;
+}
+.btnDeleteConfirm:hover:not(:disabled) { opacity: 0.88; }
+.btnDeleteConfirm:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.inviteNote {
+  font-size: 12px;
+  color: var(--text3);
+  margin-top: 12px;
+  line-height: 1.5;
+}

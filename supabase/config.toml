@@ -25,13 +25,27 @@ file_size_limit = "20MiB"
 [auth]
 enabled = true
 site_url = "http://localhost:3000"
+# Adicione aqui a URL do Render quando fizer deploy:
+# additional_redirect_urls = ["https://seu-projeto.onrender.com"]
 additional_redirect_urls = ["https://localhost:3000"]
 jwt_expiry = 3600
 enable_refresh_token_rotation = true
 refresh_token_reuse_interval = 10
-enable_signup = false   # cadastro apenas via admin
+# IMPORTANTE: deve ser true para que convites (inviteUserByEmail) funcionem.
+# O controle de quem pode convidar é feito pela Edge Function (apenas admins).
+enable_signup = true
 enable_anonymous_sign_ins = false
 
 [auth.email]
-enable_signup = false
+enable_signup = true
+# false = e-mail confirmado automaticamente (útil em dev)
+# Em produção mude para true e configure SMTP no painel do Supabase
 enable_confirmations = false
+
+# Google OAuth — configure as chaves no painel:
+# Authentication → Providers → Google → Enable
+# [auth.external.google]
+# enabled = true
+# client_id = "env(GOOGLE_CLIENT_ID)"
+# secret = "env(GOOGLE_SECRET)"
+# redirect_uri = "https://<project>.supabase.co/auth/v1/callback"
