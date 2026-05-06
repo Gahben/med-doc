@@ -27,6 +27,20 @@ export const authService = {
   signIn: (email, password) =>
     supabase.auth.signInWithPassword({ email, password }),
 
+  signInWithGoogle: () =>
+    supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin },
+    }),
+
+  resetPasswordRequest: (email) =>
+    supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    }),
+
+  updatePassword: (newPassword) =>
+    supabase.auth.updateUser({ password: newPassword }),
+
   signOut: () => supabase.auth.signOut(),
 
   getSession: () => supabase.auth.getSession(),

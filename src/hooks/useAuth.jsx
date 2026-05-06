@@ -35,6 +35,21 @@ export function AuthProvider({ children }) {
     if (error) throw error
   }
 
+  async function signInWithGoogle() {
+    const { error } = await authService.signInWithGoogle()
+    if (error) throw error
+  }
+
+  async function resetPasswordRequest(email) {
+    const { error } = await authService.resetPasswordRequest(email)
+    if (error) throw error
+  }
+
+  async function updatePassword(newPassword) {
+    const { error } = await authService.updatePassword(newPassword)
+    if (error) throw error
+  }
+
   async function signOut() {
     await authService.signOut()
     setUser(null)
@@ -42,7 +57,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, profile, loading, signIn, signInWithGoogle, resetPasswordRequest, updatePassword, signOut }}>
       {children}
     </AuthContext.Provider>
   )

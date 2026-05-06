@@ -333,3 +333,106 @@
   .formPanel { padding: 40px 24px; align-items: flex-start; padding-top: 60px; }
   .mobileLogoRow { display: flex; }
 }
+
+/* ─── GOOGLE BUTTON ──────────────────────────────────────────── */
+.googleBtn {
+  width: 100%;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 11px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: background 0.15s, border-color 0.15s;
+  min-height: 46px;
+}
+.googleBtn:hover:not(:disabled) { background: var(--surface2); border-color: var(--text3); }
+.googleBtn:disabled { opacity: 0.6; cursor: not-allowed; }
+.googleBtn svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+/* ─── DIVIDER ────────────────────────────────────────────────── */
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0;
+  color: var(--text3);
+  font-size: 12px;
+}
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ─── LABEL ROW (with forgot link) ──────────────────────────── */
+.labelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 7px;
+}
+.labelRow .label { margin-bottom: 0; }
+
+.forgotLink {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--accent);
+  padding: 0;
+  transition: opacity 0.12s;
+}
+.forgotLink:hover { opacity: 0.7; }
+
+/* ─── BACK BUTTON ────────────────────────────────────────────── */
+.backBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text2);
+  padding: 0;
+  margin-bottom: 24px;
+  transition: color 0.12s;
+}
+.backBtn:hover { color: var(--text); }
+.backBtn svg { width: 14px; height: 14px; }
+
+/* ─── SUCCESS BOX ────────────────────────────────────────────── */
+.successBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+}
+
+.successIcon {
+  width: 48px;
+  height: 48px;
+  background: var(--accent-light);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+.successIcon svg { width: 24px; height: 24px; color: var(--accent); }
+
+/* ─── DARK SPINNER ───────────────────────────────────────────── */
+.spinnerDark {
+  border-color: rgba(0,0,0,0.15);
+  border-top-color: var(--text2);
+}
