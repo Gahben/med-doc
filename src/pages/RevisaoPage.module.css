@@ -16,6 +16,59 @@
 .btnRefresh:disabled { opacity: 0.5; cursor: not-allowed; }
 .btnRefresh svg { width: 14px; height: 14px; }
 
+.filters {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 200px;
+  padding: 9px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  background: var(--surface);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.searchInput:focus { border-color: var(--accent); }
+.searchInput::placeholder { color: var(--text3); }
+
+.select {
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.select:focus { border-color: var(--accent); }
+
+.btnSearch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.12s;
+  white-space: nowrap;
+}
+.btnSearch:hover { opacity: 0.88; }
+.btnSearch svg { width: 14px; height: 14px; }
+
 .errorBox {
   background: var(--danger-light);
   border: 1px solid rgba(192,57,43,0.2);
@@ -43,7 +96,7 @@
   overflow: hidden;
 }
 
-.tableHeader {
+.tableInfo {
   padding: 10px 16px;
   border-bottom: 1px solid var(--border);
   background: var(--surface2);
@@ -54,52 +107,79 @@
   letter-spacing: 0.7px;
 }
 
-.filaList { list-style: none; }
+.tableWrap { overflow-x: auto; }
 
-.filaItem {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--border);
-  gap: 16px;
-  transition: background 0.1s;
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
 }
-.filaItem:last-child { border-bottom: none; }
-.filaItem:hover { background: var(--surface2); }
-
-.filaInfo { min-width: 0; }
-
-.filaName {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.filaMeta {
-  font-size: 12px;
+.table th {
+  text-align: left;
+  padding: 10px 14px;
+  font-size: 11px;
+  font-weight: 600;
   color: var(--text3);
-  margin-top: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
 }
+.table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  vertical-align: middle;
+}
+.row:last-child td { border-bottom: none; }
+.row:hover td { background: var(--surface2); }
 
-.btnRevisar {
-  flex-shrink: 0;
+.tdName { font-weight: 500; max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tdMono { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; color: var(--text2); }
+.tdCenter { text-align: center; }
+.tdDate { white-space: nowrap; color: var(--text2); font-size: 12px; }
+
+.btnAuditar {
   background: var(--accent);
   color: #fff;
   border: none;
   border-radius: 7px;
-  padding: 7px 16px;
-  font-size: 13px;
+  padding: 6px 14px;
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
+  white-space: nowrap;
   transition: opacity 0.12s;
 }
-.btnRevisar:hover { opacity: 0.88; }
+.btnAuditar:hover { opacity: 0.88; }
 
-/* ─── MODAL ────────────────────────────────────────────────── */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface2);
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.pageInfo { font-size: 12px; color: var(--text3); }
+.pageControls { display: flex; gap: 8px; align-items: center; }
+.btnPage {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text2);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.btnPage:hover:not(:disabled) { background: var(--surface2); }
+.btnPage:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ─── MODAL ─────────────────────────────────────────────────── */
 .overlay {
   position: fixed;
   inset: 0;
@@ -118,7 +198,7 @@
   border-radius: 14px;
   box-shadow: 0 8px 40px rgba(0,0,0,0.15);
   width: 100%;
-  max-width: 520px;
+  max-width: 540px;
   animation: slideUp 0.2s cubic-bezier(0.22,1,0.36,1);
   overflow: hidden;
 }
@@ -129,12 +209,14 @@
 
 .modalHeader {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   padding: 20px 24px 16px;
   border-bottom: 1px solid var(--border);
+  gap: 12px;
 }
-.modalHeader h3 { font-size: 16px; font-weight: 600; }
+.modalHeader h3 { font-size: 16px; font-weight: 600; margin: 0; }
+.modalSub { font-size: 12px; color: var(--text3); margin-top: 3px; display: block; }
 
 .modalClose {
   background: none;
@@ -146,6 +228,7 @@
   display: flex;
   align-items: center;
   transition: color 0.12s;
+  flex-shrink: 0;
 }
 .modalClose:hover { color: var(--text); }
 .modalClose svg { width: 18px; height: 18px; }
@@ -166,7 +249,6 @@
   margin-bottom: 3px;
 }
 .detailGrid dd { font-size: 14px; color: var(--text); }
-
 .colSpan2 { grid-column: 1 / -1; }
 .mono { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; }
 .preWrap { white-space: pre-wrap; }
@@ -175,7 +257,6 @@
   padding-top: 12px;
   border-top: 1px solid var(--border);
 }
-
 .linkBtn {
   display: inline-flex;
   align-items: center;
@@ -187,17 +268,10 @@
 }
 .linkBtn:hover { opacity: 0.75; }
 .linkBtn svg { width: 15px; height: 15px; }
-
 .loadingText { font-size: 13px; color: var(--text3); }
 
 .obsField { display: flex; flex-direction: column; gap: 6px; }
-
-.obsLabel {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text2);
-}
-
+.obsLabel { font-size: 13px; font-weight: 500; color: var(--text2); }
 .textarea {
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -220,7 +294,6 @@
   padding: 14px 24px 20px;
   border-top: 1px solid var(--border);
 }
-
 .btnReprovar {
   flex: 1;
   background: var(--danger-light);
@@ -235,7 +308,6 @@
 }
 .btnReprovar:hover:not(:disabled) { background: #fad5d3; }
 .btnReprovar:disabled { opacity: 0.5; cursor: not-allowed; }
-
 .btnAprovar {
   flex: 1;
   background: var(--accent);

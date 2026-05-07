@@ -41,6 +41,7 @@ export default function Layout() {
 
   const canUpload  = profile?.role === 'admin' || profile?.role === 'operador'
   const canAudit   = profile?.role === 'admin' || profile?.role === 'auditor'
+  const canReview  = profile?.role === 'admin' || profile?.role === 'revisor'
   const isAdmin    = profile?.role === 'admin'
 
   return (
@@ -87,6 +88,11 @@ export default function Layout() {
                 {Icons.logs} Logs
               </NavLink>
             </>
+          )}
+          {canReview && (
+            <NavLink to="/revisor" className={({ isActive }) => `${styles.sidebarItem} ${isActive ? styles.active : ''}`}>
+              {Icons.review} Solicitações
+            </NavLink>
           )}
           {isAdmin && (
             <>

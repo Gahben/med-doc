@@ -9,6 +9,7 @@ import RevisaoPage from './pages/RevisaoPage'
 import LogsPage from './pages/LogsPage'
 import AdminPage from './pages/AdminPage'
 import LixeiraPage from './pages/LixeiraPage'
+import RevisorPage from './pages/RevisorPage'
 
 function RequireAuth({ children, roles }) {
   const { user, profile, loading } = useAuth()
@@ -44,6 +45,9 @@ export default function App() {
         } />
         <Route path="logs" element={
           <RequireAuth roles={['admin', 'auditor']}><LogsPage /></RequireAuth>
+        } />
+        <Route path="revisor" element={
+          <RequireAuth roles={['admin', 'revisor']}><RevisorPage /></RequireAuth>
         } />
         <Route path="lixeira" element={
           <RequireAuth roles={['admin']}><LixeiraPage /></RequireAuth>
