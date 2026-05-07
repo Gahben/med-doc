@@ -108,7 +108,7 @@ Deno.serve(async (req) => {
       const updates: Record<string, unknown> = {}
 
       if (role !== undefined) {
-        if (!['admin', 'revisor', 'operador'].includes(role)) {
+        if (!['admin', 'auditor', 'revisor', 'operador'].includes(role)) {
           throw new Error('Role inválido')
         }
         updates.role = role
