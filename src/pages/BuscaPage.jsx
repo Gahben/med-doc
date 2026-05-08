@@ -26,7 +26,7 @@ export default function BuscaPage() {
   const log = useAuditLog()
 
   const [query,   setQuery]   = useState('')
-  const [status,  setStatus]  = useState('')
+  const [workflowFilter,  setWorkflowFilter]  = useState('')
   const [sector,  setSector]  = useState('')
   const [page,    setPage]    = useState(0)
   const [rows,    setRows]    = useState([])
@@ -68,8 +68,8 @@ export default function BuscaPage() {
       if (query.trim()) {
         q = q.or(`patient_name.ilike.%${query.trim()}%,record_number.ilike.%${query.trim()}%,patient_cpf.ilike.%${query.trim()}%`)
       }
-      if (status && status !== 'todos') {
-        q = q.eq('status', status)
+      if (workflowFilter && workflowFilter !== 'todos') {
+        q = q.eq('workflow_status', workflowFilter)
       }
       if (sector) {
         q = q.eq('origin_sector', sector)
@@ -93,7 +93,7 @@ export default function BuscaPage() {
   function handleFilterChange(field, value) {
     setPage(0)
     if (field === 'query')  setQuery(value)
-    if (field === 'status') setStatus(value)
+    if (field === 'workflow') setWorkflowFilter(value)
     if (field === 'sector') setSector(value)
   }
 
@@ -221,14 +221,14 @@ export default function BuscaPage() {
           className={styles.searchInput}
         />
         <select
-          value={status}
-          onChange={e => handleFilterChange('status', e.target.value)}
+          value={workflowFilter}
+          onChange={e => handleFilterChange('workflow', e.target.value)}
           className={styles.select}
         >
           <option value="">Todos os status</option>
-          <option value="pending">Aguardando</option>
-          <option value="approved">Liberado</option>
-          <option value="reproved">Não liberado</option>
+          {Object.entries(STATUS_WORKFLOW).map(([key, cfg]) => (
+            <option key={key} value={key}>{cfg.icon} {cfg.label}</option>
+          ))}
         </select>
         {sectors.length > 0 && (
           <select
@@ -270,7 +270,6 @@ export default function BuscaPage() {
                 <th>Tipo</th>
                 <th>Setor</th>
                 <th>Data</th>
-                <th>Status doc.</th>
                 <th>Status fluxo</th>
                 <th></th>
               </tr>
@@ -287,7 +286,6 @@ export default function BuscaPage() {
                       ? format(new Date(row.document_date), 'dd/MM/yyyy', { locale: ptBR })
                       : '—'}
                   </td>
-                  <td>{row.status ? <Badge status={row.status} /> : '—'}</td>
                   <td><WfBadge status={row.workflow_status} /></td>
                   <td className={styles.tdActions}>
                     <button onClick={() => openDetail(row)} className={styles.btnDetail}>

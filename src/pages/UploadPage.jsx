@@ -295,14 +295,18 @@ export default function UploadPage() {
                 />
               </Field>
 
-              // Encontre o Field do CPF e substitua o Input por:
               <Field label="CPF" required>
                 <Input
                   placeholder="000.000.000-00"
                   value={form.patient_cpf}
                   onChange={e => handleCpfChange(e.target.value)}
                   maxLength={14}
-                  className={`${styles.inputCpf} ${cpfError ? styles.inputError : ''}`}
+                  className={cpfError ? styles.inputError : ''}
+                  style={{ 
+                    fontFamily: "'SF Mono', 'Fira Code', monospace",
+                    letterSpacing: '1.2px',
+                    fontSize: '15px' 
+                  }}
                   inputMode="numeric"
                 />
                 {cpfError && <span className={styles.fieldError}>{cpfError}</span>}

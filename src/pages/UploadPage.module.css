@@ -319,6 +319,10 @@
 .inputCpf {
   letter-spacing: 0.5px;
   font-variant-numeric: tabular-nums;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  letter-spacing: 1.2px;
+  font-size: 15px;
+  padding: 10px 14px;
 }
 
 .fieldError {

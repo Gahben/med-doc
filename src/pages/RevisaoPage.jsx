@@ -95,8 +95,10 @@ export default function RevisaoPage() {
 
       // Filtro de status de documento
       if (workflowFilter) {
-        q = q.eq('status', workflowFilter)
+        q = q.eq('workflow_status', workflowFilter)
       } else {
+        // Quando "Todos", mostra os relevantes para auditoria
+        q = q.in('workflow_status', ['in_audit', 'correction_needed', 'corrected', 'concluded'])
         q = q.neq('status', 'trash')
       }
 

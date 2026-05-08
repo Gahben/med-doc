@@ -110,7 +110,11 @@ export default function RevisorPage() {
           `patient_name.ilike.%${search.trim()}%,record_number.ilike.%${search.trim()}%,patient_cpf.ilike.%${search.trim()}%`
         )
       }
-      if (wfFilter) q = q.eq('workflow_status', wfFilter)
+      if (wfFilter) {
+        q = q.eq('workflow_status', wfFilter)
+      }
+      // Sempre excluir lixeira
+      q = q.neq('status', 'trash')
 
       const { data, count, error: err } = await q
       if (err) throw err
