@@ -8,14 +8,13 @@ import toast from 'react-hot-toast'
 import { PageHeader, EmptyState } from '../components/UI'
 import styles from './RevisorPage.module.css'
 
-// Status do fluxo externo que o revisor pode atribuir
 const WORKFLOW_LABELS = {
-  received:         { label: 'Recebida',          color: 'info'    },
-  request_approved: { label: 'Aprovada',           color: 'success' },
-  request_rejected: { label: 'Recusada',           color: 'danger'  },
-  in_production:    { label: 'Em produção',        color: 'warning' },
-  in_audit:         { label: 'Em auditoria',       color: 'purple'  },
-  delivered:        { label: 'Entregue',           color: 'success' },
+  received:         { label: 'Recebida',      color: 'info'    },
+  request_approved: { label: 'Aprovada',      color: 'success' },
+  request_rejected: { label: 'Recusada',      color: 'danger'  },
+  in_production:    { label: 'Em produção',   color: 'warning' },
+  in_audit:         { label: 'Em auditoria',  color: 'purple'  },
+  delivered:        { label: 'Entregue',      color: 'success' },
 }
 
 const NOTE_TYPES = [
@@ -25,16 +24,16 @@ const NOTE_TYPES = [
 ]
 
 const SORT_OPTIONS = [
-  { value: 'created_at:desc',   label: 'Mais recentes primeiro' },
-  { value: 'created_at:asc',    label: 'Mais antigos primeiro' },
-  { value: 'patient_name:asc',  label: 'Paciente (A→Z)' },
-  { value: 'patient_name:desc', label: 'Paciente (Z→A)' },
-  { value: 'record_number:asc', label: 'Número (crescente)' },
-  { value: 'record_number:desc',label: 'Número (decrescente)' },
+  { value: 'created_at:desc',    label: 'Mais recentes primeiro' },
+  { value: 'created_at:asc',     label: 'Mais antigos primeiro' },
+  { value: 'patient_name:asc',   label: 'Paciente (A→Z)' },
+  { value: 'patient_name:desc',  label: 'Paciente (Z→A)' },
+  { value: 'record_number:asc',  label: 'Número (crescente)' },
+  { value: 'record_number:desc', label: 'Número (decrescente)' },
 ]
 
 const STATUS_FILTER_OPTIONS = [
-  { value: '',                 label: 'Todos os status' },
+  { value: '',                 label: 'Todos os status de fluxo' },
   { value: 'received',         label: 'Recebidas' },
   { value: 'request_approved', label: 'Aprovadas' },
   { value: 'request_rejected', label: 'Recusadas' },
@@ -49,28 +48,25 @@ export default function RevisorPage() {
   const { user, loading: authLoading } = useAuth()
   const log = useAuditLog()
 
-  const [rows,          setRows]          = useState([])
-  const [total,         setTotal]         = useState(0)
-  const [loading,       setLoading]       = useState(false)
-  const [error,         setError]         = useState('')
-  const [page,          setPage]          = useState(0)
-  const [search,        setSearch]        = useState('')
-  const [sort,          setSort]          = useState('created_at:desc')
-  const [wfFilter,      setWfFilter]      = useState('')
+  const [rows,         setRows]         = useState([])
+  const [total,        setTotal]        = useState(0)
+  const [loading,      setLoading]      = useState(false)
+  const [error,        setError]        = useState('')
+  const [page,         setPage]         = useState(0)
+  const [search,       setSearch]       = useState('')
+  const [sort,         setSort]         = useState('created_at:desc')
+  const [wfFilter,     setWfFilter]     = useState('')
 
-  // Modal de prontuário
-  const [selected,      setSelected]      = useState(null)
-  const [notes,         setNotes]         = useState([])
-  const [loadingNotes,  setLoadingNotes]  = useState(false)
+  const [selected,     setSelected]     = useState(null)
+  const [notes,        setNotes]        = useState([])
+  const [loadingNotes, setLoadingNotes] = useState(false)
 
-  // Form nota
-  const [noteText,      setNoteText]      = useState('')
-  const [noteType,      setNoteType]      = useState('needs_contact')
-  const [savingNote,    setSavingNote]    = useState(false)
+  const [noteText,     setNoteText]     = useState('')
+  const [noteType,     setNoteType]     = useState('needs_contact')
+  const [savingNote,   setSavingNote]   = useState(false)
 
-  // Form workflow
-  const [wfAction,      setWfAction]      = useState('')
-  const [savingWf,      setSavingWf]      = useState(false)
+  const [wfAction,     setWfAction]     = useState('')
+  const [savingWf,     setSavingWf]     = useState(false)
 
   const [sortField, sortDir] = sort.split(':')
 
@@ -86,11 +82,11 @@ export default function RevisorPage() {
         .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1)
 
       if (search.trim()) {
-        q = q.or(`patient_name.ilike.%${search.trim()}%,record_number.ilike.%${search.trim()}%,patient_cpf.ilike.%${search.trim()}%`)
+        q = q.or(
+          `patient_name.ilike.%${search.trim()}%,record_number.ilike.%${search.trim()}%,patient_cpf.ilike.%${search.trim()}%`
+        )
       }
-      if (wfFilter) {
-        q = q.eq('workflow_status', wfFilter)
-      }
+      if (wfFilter) q = q.eq('workflow_status', wfFilter)
 
       const { data, count, error: err } = await q
       if (err) throw err
@@ -139,14 +135,14 @@ export default function RevisorPage() {
     try {
       const { error: err } = await supabase.from('reviewer_notes').insert({
         prontuario_id: selected.id,
-        note_text: noteText.trim(),
-        note_type: noteType,
+        note_text:     noteText.trim(),
+        note_type:     noteType,
       })
       if (err) throw err
-      await log('revisao', `Nota adicionada ao prontuário ${selected.record_number}`, selected.id)
+      // FIX: usa 'reviewer_note' que é valor válido no enum
+      await log('reviewer_note', `Nota adicionada ao prontuário ${selected.record_number}`, selected.id)
       toast.success('Nota registrada.')
       setNoteText('')
-      // Recarrega notas
       const { data } = await supabase
         .from('reviewer_notes')
         .select('*, profiles!author_id(name, role)')
@@ -183,7 +179,8 @@ export default function RevisorPage() {
         .update({ workflow_status: wfAction })
         .eq('id', selected.id)
       if (err) throw err
-      await log('workflow_update', `Workflow atualizado para "${wfAction}" no prontuário ${selected.record_number}`, selected.id)
+      // FIX: usa 'workflow_update' que é valor válido no enum
+      await log('workflow_update', `Workflow → "${WORKFLOW_LABELS[wfAction]?.label}" · ${selected.record_number}`, selected.id)
       toast.success(`Status atualizado para "${WORKFLOW_LABELS[wfAction]?.label}".`)
       setSelected(prev => ({ ...prev, workflow_status: wfAction }))
       setWfAction('')
@@ -219,18 +216,16 @@ export default function RevisorPage() {
         }
       />
 
-      {/* Aviso sistema externo */}
       <div className={styles.infoBox}>
         <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" className={styles.infoIcon}>
           <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
         </svg>
         <span>
           As <strong>solicitações de prontuários</strong> chegarão pelo portal externo (em breve).
-          Por aqui você acompanha o andamento, registra notas para o operador e atualiza o status de fluxo manualmente quando necessário.
+          Por aqui você acompanha o andamento, registra notas para o operador e atualiza o status de fluxo.
         </span>
       </div>
 
-      {/* Filtros */}
       <div className={styles.filters}>
         <input
           type="text"
@@ -286,10 +281,10 @@ export default function RevisorPage() {
                       <td>{row.document_type || '—'}</td>
                       <td>
                         <span className={`${styles.docBadge} ${styles['doc_' + row.status]}`}>
-                          { row.status === 'approved' ? 'Aprovado'
-                          : row.status === 'reproved' ? 'Reprovado'
-                          : row.status === 'pending'  ? 'Pendente'
-                          : row.status }
+                          {row.status === 'approved' ? 'Liberado'
+                           : row.status === 'reproved' ? 'Não liberado'
+                           : row.status === 'pending'  ? 'Aguardando'
+                           : row.status}
                         </span>
                       </td>
                       <td><WfBadge status={row.workflow_status} /></td>
@@ -320,7 +315,6 @@ export default function RevisorPage() {
         )}
       </div>
 
-      {/* Modal detalhe / notas */}
       {selected && (
         <div className={styles.overlay} onClick={closeDetail}>
           <div className={styles.modal} onClick={e => e.stopPropagation()}>
@@ -337,8 +331,6 @@ export default function RevisorPage() {
             </div>
 
             <div className={styles.modalBody}>
-
-              {/* Info básica */}
               <dl className={styles.detailGrid}>
                 <div><dt>CPF</dt><dd className={styles.mono}>{selected.patient_cpf || '—'}</dd></div>
                 <div><dt>Páginas</dt><dd>{selected.pages || '—'}</dd></div>
@@ -346,14 +338,14 @@ export default function RevisorPage() {
                   <dt>Status do documento</dt>
                   <dd>
                     <span className={`${styles.docBadge} ${styles['doc_' + selected.status]}`}>
-                      { selected.status === 'approved' ? 'Aprovado'
-                      : selected.status === 'reproved' ? 'Reprovado'
-                      : 'Pendente' }
+                      {selected.status === 'approved' ? 'Liberado'
+                       : selected.status === 'reproved' ? 'Não liberado'
+                       : 'Aguardando'}
                     </span>
                   </dd>
                 </div>
                 <div>
-                  <dt>Status de fluxo atual</dt>
+                  <dt>Status de fluxo</dt>
                   <dd>
                     {selected.workflow_status
                       ? <span className={`${styles.wfBadge} ${styles['wf_' + (WORKFLOW_LABELS[selected.workflow_status]?.color || 'info')]}`}>
@@ -386,8 +378,7 @@ export default function RevisorPage() {
               <div className={styles.section}>
                 <h4 className={styles.sectionTitle}>Atualizar status de fluxo</h4>
                 <p className={styles.sectionHint}>
-                  Use para registrar manualmente o andamento desta solicitação.
-                  Quando o portal externo estiver ativo, atualizações virão automaticamente via webhook.
+                  Registre manualmente o andamento desta solicitação.
                 </p>
                 <div className={styles.wfRow}>
                   <select value={wfAction} onChange={e => setWfAction(e.target.value)} className={styles.select}>
@@ -411,11 +402,11 @@ export default function RevisorPage() {
                 <h4 className={styles.sectionTitle}>
                   Notas para o operador
                   {notes.filter(n => !n.resolved).length > 0 && (
-                    <span className={styles.noteBadge}>{notes.filter(n => !n.resolved).length} pendente{notes.filter(n => !n.resolved).length > 1 ? 's' : ''}</span>
+                    <span className={styles.noteBadge}>
+                      {notes.filter(n => !n.resolved).length} pendente{notes.filter(n => !n.resolved).length > 1 ? 's' : ''}
+                    </span>
                   )}
                 </h4>
-
-                {/* Form nova nota */}
                 <div className={styles.noteForm}>
                   <select value={noteType} onChange={e => setNoteType(e.target.value)} className={styles.select}>
                     {NOTE_TYPES.map(t => (
@@ -438,7 +429,6 @@ export default function RevisorPage() {
                   </button>
                 </div>
 
-                {/* Lista de notas */}
                 {loadingNotes ? (
                   <div className={styles.notesLoading}><span className="spinner dark" /></div>
                 ) : notes.length === 0 ? (

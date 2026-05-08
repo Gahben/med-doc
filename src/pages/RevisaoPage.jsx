@@ -11,14 +11,14 @@ import styles from './RevisaoPage.module.css'
 const PAGE_SIZE = 20
 
 const SORT_OPTIONS = [
-  { value: 'created_at:asc',    label: 'Mais antigos primeiro' },
-  { value: 'created_at:desc',   label: 'Mais recentes primeiro' },
-  { value: 'patient_name:asc',  label: 'Paciente (A→Z)' },
-  { value: 'patient_name:desc', label: 'Paciente (Z→A)' },
+  { value: 'created_at:asc',     label: 'Mais antigos primeiro' },
+  { value: 'created_at:desc',    label: 'Mais recentes primeiro' },
+  { value: 'patient_name:asc',   label: 'Paciente (A→Z)' },
+  { value: 'patient_name:desc',  label: 'Paciente (Z→A)' },
   { value: 'record_number:asc',  label: 'Número (crescente)' },
   { value: 'record_number:desc', label: 'Número (decrescente)' },
-  { value: 'pages:desc', label: 'Mais páginas primeiro' },
-  { value: 'pages:asc',  label: 'Menos páginas primeiro' },
+  { value: 'pages:desc',         label: 'Mais páginas primeiro' },
+  { value: 'pages:asc',          label: 'Menos páginas primeiro' },
 ]
 
 export default function RevisaoPage() {
@@ -53,7 +53,9 @@ export default function RevisaoPage() {
         .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1)
 
       if (search.trim()) {
-        q = q.or(`patient_name.ilike.%${search.trim()}%,record_number.ilike.%${search.trim()}%,patient_cpf.ilike.%${search.trim()}%`)
+        q = q.or(
+          `patient_name.ilike.%${search.trim()}%,record_number.ilike.%${search.trim()}%,patient_cpf.ilike.%${search.trim()}%`
+        )
       }
 
       const { data, count, error: err } = await q
@@ -70,12 +72,6 @@ export default function RevisaoPage() {
   useEffect(() => {
     if (!authLoading && user) fetchFila()
   }, [fetchFila, authLoading, user])
-
-  function handleSearchSubmit(e) {
-    e.preventDefault()
-    setPage(0)
-    fetchFila()
-  }
 
   async function openReview(row) {
     setCurrent(row)
@@ -107,15 +103,21 @@ export default function RevisaoPage() {
       const { error: err } = await supabase
         .from('prontuarios')
         .update({
-          status: novoStatus,
+          status:      novoStatus,
           reviewed_at: new Date().toISOString(),
           reviewed_by: user.id,
-          workflow_status: novoStatus === 'approved' ? 'in_production' : null,
           ...(obs.trim() ? { review_note: obs.trim() } : {}),
         })
         .eq('id', current.id)
       if (err) throw err
-      await log('auditoria', `Prontuário ${current.record_number} ${novoStatus === 'approved' ? 'aprovado' : 'reprovado'} pelo auditor`, current.id)
+
+      // FIX: usa valores válidos do enum audit_action
+      await log(
+        novoStatus === 'approved' ? 'approved' : 'reproved',
+        `Prontuário ${current.record_number} ${novoStatus === 'approved' ? 'aprovado' : 'reprovado'}`,
+        current.id
+      )
+
       toast.success(novoStatus === 'approved' ? '✓ Prontuário aprovado.' : '✕ Prontuário reprovado.')
       closeReview()
       fetchFila()
@@ -144,8 +146,7 @@ export default function RevisaoPage() {
         }
       />
 
-      {/* Filtros */}
-      <form onSubmit={handleSearchSubmit} className={styles.filters}>
+      <form onSubmit={e => { e.preventDefault(); setPage(0); fetchFila() }} className={styles.filters}>
         <input
           type="text"
           placeholder="Buscar por paciente, número ou CPF…"
@@ -190,10 +191,10 @@ export default function RevisaoPage() {
                   <tr>
                     <th>Paciente</th>
                     <th>Número</th>
-                    <th>Tipo de documento</th>
+                    <th>Tipo</th>
                     <th>Páginas</th>
                     <th>Enviado por</th>
-                    <th>Data de envio</th>
+                    <th>Data</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -234,7 +235,7 @@ export default function RevisaoPage() {
         )}
       </div>
 
-      {/* Modal */}
+      {/* Modal de auditoria */}
       {current && (
         <div className={styles.overlay} onClick={closeReview}>
           <div className={styles.modal} onClick={e => e.stopPropagation()}>
@@ -260,12 +261,27 @@ export default function RevisaoPage() {
                 <div><dt>Enviado por</dt><dd>{current.profiles?.name || '—'}</dd></div>
                 <div className={styles.colSpan2}>
                   <dt>Enviado em</dt>
-                  <dd>{current.created_at ? format(new Date(current.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : '—'}</dd>
+                  <dd>{current.created_at
+                    ? format(new Date(current.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
+                    : '—'}
+                  </dd>
                 </div>
                 {current.upload_note && (
                   <div className={styles.colSpan2}>
                     <dt>Obs. do upload</dt>
                     <dd className={styles.preWrap}>{current.upload_note}</dd>
+                  </div>
+                )}
+                {/* Mostra nota de reenvio se houver */}
+                {current.resubmit_note && (
+                  <div className={styles.colSpan2}>
+                    <dt className={styles.resubmitLabel}>
+                      <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 16 16">
+                        <path d="M13.5 2.5l-11 11M5 2.5H2.5V5M13.5 11v2.5H11"/>
+                      </svg>
+                      Nota do reenvio
+                    </dt>
+                    <dd className={styles.preWrap}>{current.resubmit_note}</dd>
                   </div>
                 )}
               </dl>
