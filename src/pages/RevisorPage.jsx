@@ -70,7 +70,7 @@ export default function RevisorPage() {
   const [wfFilter,     setWfFilter]     = useState('')
 
   const [selected,     setSelected]     = useState(null)
-  const [notes,        setNotes]        = useState([])\
+  const [notes,        setNotes]        = useState([])
   const [loadingNotes, setLoadingNotes] = useState(false)
 
   const [noteText,     setNoteText]     = useState('')
