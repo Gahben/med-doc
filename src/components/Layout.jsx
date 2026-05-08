@@ -75,6 +75,14 @@ export default function Layout() {
               {Icons.upload} Upload
             </NavLink>
           )}
+          {canUpload && (
+            <>
+              <span className={styles.sidebarLabel}>Produção</span>
+              <NavLink to="/producao" className={({ isActive }) => `${styles.sidebarItem} ${isActive ? styles.active : ''}`}>
+                {Icons.review} Produção
+              </NavLink>
+            </>
+          )}
           {canAudit && (
             <NavLink to="/revisao" className={({ isActive }) => `${styles.sidebarItem} ${isActive ? styles.active : ''}`}>
               {Icons.review} Auditoria
