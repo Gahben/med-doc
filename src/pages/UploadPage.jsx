@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
-import { prontuariosService, storageService } from '../lib/storage'
+import { prontuariosService, storageService, hashFile, checkDuplicateHash, cpfHelpers } from '../lib/storage'
 import { useAuth } from '../hooks/useAuth'
 import { useAuditLog } from '../hooks/useAuditLog'
 import toast from 'react-hot-toast'
@@ -9,31 +9,67 @@ import styles from './UploadPage.module.css'
 
 const DOC_TYPES = [
   'Prontuário médico',
+  'Sumário de alta',
+  'Boletim de atendimento de urgência (BAU)',
   'Exame laboratorial',
-  'Laudo de imagem',
+  'Laudo de imagem (raio-x, tomografia, ressonância)',
+  'Laudo anatomopatológico',
   'Receituário',
-  'Declaração / atestado',
+  'Prescrição médica',
+  'Declaração / atestado médico',
+  'Termo de consentimento',
+  'Relatório cirúrgico',
+  'Relatório de enfermagem',
+  'Histórico de vacinação',
+  'Outro',
+]
+
+// Setores hospitalares comuns — o operador também pode digitar livremente
+const COMMON_SECTORS = [
+  '',
+  'Clínica Médica',
+  'Clínica Cirúrgica',
+  'Pronto-Socorro',
+  'UTI Adulto',
+  'UTI Neonatal',
+  'Centro Cirúrgico',
+  'Maternidade',
+  'Pediatria',
+  'Oncologia',
+  'Ortopedia',
+  'Cardiologia',
+  'Neurologia',
+  'Psiquiatria',
+  'Endoscopia / Gastroenterologia',
+  'Fisioterapia / Reabilitação',
+  'Laboratório',
+  'Radiologia / Imagem',
+  'Farmácia',
+  'Ambulatório',
   'Outro',
 ]
 
 const INITIAL = {
-  patient_name: '',
-  patient_cpf: '',
-  record_number: '',
-  document_type: 'Prontuário médico',
-  document_date: new Date().toISOString().split('T')[0],
-  upload_note: '',
-  locked: false,
+  patient_name:    '',
+  patient_cpf:     '',
+  record_number:   '',
+  document_type:   'Prontuário médico',
+  document_date:   new Date().toISOString().split('T')[0],
+  origin_sector:   '',
+  upload_note:     '',
+  locked:          false,
 }
 
 export default function UploadPage() {
   const { user } = useAuth()
   const log = useAuditLog()
 
-  const [form, setForm]       = useState(INITIAL)
-  const [file, setFile]       = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [success, setSuccess] = useState(false)
+  const [form,        setForm]        = useState(INITIAL)
+  const [file,        setFile]        = useState(null)
+  const [loading,     setLoading]     = useState(false)
+  const [success,     setSuccess]     = useState(false)
+  const [cpfError,    setCpfError]    = useState('')
+  const [customSector, setCustomSector] = useState(false)
 
   const onDrop = useCallback(accepted => {
     if (accepted[0]) setFile(accepted[0])
@@ -49,12 +85,42 @@ export default function UploadPage() {
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
+  function handleCpfChange(raw) {
+    const masked = cpfHelpers.mask(raw)
+    set('patient_cpf', masked)
+    const stripped = cpfHelpers.strip(masked)
+    if (stripped.length === 11) {
+      setCpfError(cpfHelpers.isValid(masked) ? '' : 'CPF inválido')
+    } else {
+      setCpfError('')
+    }
+  }
+
+  function handleSectorChange(value) {
+    if (value === 'Outro') {
+      setCustomSector(true)
+      set('origin_sector', '')
+    } else {
+      setCustomSector(false)
+      set('origin_sector', value)
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
+
     if (!form.patient_name || !form.patient_cpf || !form.record_number) {
       toast.error('Preencha todos os campos obrigatórios.')
       return
     }
+
+    // Valida CPF
+    if (!cpfHelpers.isValid(form.patient_cpf)) {
+      setCpfError('CPF inválido')
+      toast.error('CPF inválido. Verifique o número.')
+      return
+    }
+
     if (!file) {
       toast.error('Selecione um arquivo para enviar.')
       return
@@ -62,23 +128,37 @@ export default function UploadPage() {
 
     setLoading(true)
     try {
-      // 1. Upload do arquivo para o Storage
+      // 1. Calcula hash e verifica duplicata
+      const fileHash = await hashFile(file)
+      const duplicate = await checkDuplicateHash(fileHash)
+      if (duplicate) {
+        toast.error(
+          `Arquivo duplicado! Este documento já foi enviado como prontuário ${duplicate.record_number} (${duplicate.patient_name}).`,
+          { duration: 6000 }
+        )
+        setLoading(false)
+        return
+      }
+
+      // 2. Upload do arquivo para o Storage
       const ext = file.name.split('.').pop()
       const path = `${user.id}/${Date.now()}_${form.record_number}.${ext}`
       await storageService.upload(file, path)
 
-      // 2. Inserir registro no banco
+      // 3. Inserir registro no banco
       const { data, error } = await prontuariosService.create({
         ...form,
-        file_path: path,
-        file_name: file.name,
-        file_size: file.size,
-        status: 'pending',
-        uploaded_by: user.id,
+        patient_cpf:  cpfHelpers.format(form.patient_cpf),
+        file_path:    path,
+        file_name:    file.name,
+        file_size:    file.size,
+        file_hash:    fileHash,
+        status:       'pending',
+        uploaded_by:  user.id,
       })
       if (error) throw error
 
-      // 3. Log de auditoria
+      // 4. Log de auditoria
       await log('upload', `Enviou prontuário ${form.record_number} de ${form.patient_name}`, data.id)
 
       toast.success('Prontuário enviado para revisão!')
@@ -99,6 +179,8 @@ export default function UploadPage() {
     setForm(INITIAL)
     setFile(null)
     setSuccess(false)
+    setCpfError('')
+    setCustomSector(false)
   }
 
   if (success) {
@@ -112,7 +194,7 @@ export default function UploadPage() {
             </svg>
           </div>
           <h3>Enviado para revisão!</h3>
-          <p>O prontuário foi indexado e está aguardando aprovação de um Revisor.</p>
+          <p>O prontuário foi indexado e está aguardando aprovação de um Auditor.</p>
           <BtnAccent onClick={reset}>
             <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
@@ -157,14 +239,18 @@ export default function UploadPage() {
                   onChange={e => set('patient_name', e.target.value)}
                 />
               </Field>
-              <Field label="CPF" required>
+
+              <Field label="CPF" required error={cpfError}>
                 <Input
                   placeholder="000.000.000-00"
                   value={form.patient_cpf}
-                  onChange={e => set('patient_cpf', e.target.value)}
+                  onChange={e => handleCpfChange(e.target.value)}
                   maxLength={14}
+                  className={cpfError ? styles.inputError : ''}
                 />
+                {cpfError && <span className={styles.fieldError}>{cpfError}</span>}
               </Field>
+
               <Field label="Número do prontuário" required>
                 <Input
                   placeholder="Ex.: 2024-00891"
@@ -172,6 +258,7 @@ export default function UploadPage() {
                   onChange={e => set('record_number', e.target.value)}
                 />
               </Field>
+
               <Field label="Data do documento">
                 <Input
                   type="date"
@@ -179,6 +266,7 @@ export default function UploadPage() {
                   onChange={e => set('document_date', e.target.value)}
                 />
               </Field>
+
               <div className={styles.fullCol}>
                 <Field label="Tipo de documento">
                   <Select
@@ -189,6 +277,35 @@ export default function UploadPage() {
                   </Select>
                 </Field>
               </div>
+
+              <div className={styles.fullCol}>
+                <Field label="Setor de origem">
+                  {customSector ? (
+                    <div className={styles.customSectorRow}>
+                      <Input
+                        placeholder="Digite o nome do setor…"
+                        value={form.origin_sector}
+                        onChange={e => set('origin_sector', e.target.value)}
+                      />
+                      <button
+                        type="button"
+                        className={styles.btnClearSector}
+                        onClick={() => { setCustomSector(false); set('origin_sector', '') }}
+                        title="Voltar para lista"
+                      >✕</button>
+                    </div>
+                  ) : (
+                    <Select
+                      value={form.origin_sector}
+                      onChange={e => handleSectorChange(e.target.value)}
+                    >
+                      <option value="">Selecione o setor…</option>
+                      {COMMON_SECTORS.filter(Boolean).map(s => <option key={s}>{s}</option>)}
+                    </Select>
+                  )}
+                </Field>
+              </div>
+
               <div className={styles.fullCol}>
                 <Field label="Observação de upload (opcional)">
                   <Textarea
@@ -216,7 +333,7 @@ export default function UploadPage() {
             </div>
 
             <div className={styles.formActions}>
-              <BtnAccent type="submit" disabled={loading}>
+              <BtnAccent type="submit" disabled={loading || !!cpfError}>
                 {loading ? <span className="spinner" /> : (
                   <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                     <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/storage'
+import { STATUS_WORKFLOW, ALLOWED_TRANSITIONS_BY_ROLE } from '../lib/storage'
 import { useAuth } from '../hooks/useAuth'
 import { useAuditLog } from '../hooks/useAuditLog'
 import { format } from 'date-fns'
@@ -21,25 +22,69 @@ const SORT_OPTIONS = [
   { value: 'pages:asc',          label: 'Menos páginas primeiro' },
 ]
 
+// Filtro de status de documento para a fila de auditoria
+const STATUS_FILTER_OPTIONS = [
+  { value: 'pending',  label: 'Aguardando auditoria' },
+  { value: 'approved', label: 'Liberados' },
+  { value: 'reproved', label: 'Não liberados' },
+  { value: '',         label: 'Todos (exceto lixeira)' },
+]
+
+// Ações do auditor sobre o workflow (não o status do documento)
+// O auditor move o prontuário no fluxo: in_audit → correction_needed | concluded
+const AUDITOR_WF_ACTIONS = [
+  { value: 'correction_needed', label: '✏️ Solicitar correção' },
+  { value: 'corrected',         label: '🔄 Marcar como corrigido' },
+  { value: 'concluded',         label: '🏁 Concluir (auditoria OK)' },
+]
+
+function WfBadge({ status }) {
+  if (!status) return <span className={styles.badgeNone}>—</span>
+  const cfg = STATUS_WORKFLOW[status] || { label: status, color: 'info', icon: '' }
+  return (
+    <span className={`${styles.wfBadge} ${styles['wf_' + cfg.color]}`}>
+      {cfg.icon} {cfg.label}
+    </span>
+  )
+}
+
 export default function RevisaoPage() {
-  const { user, loading: authLoading } = useAuth()
+  const { user, profile, loading: authLoading } = useAuth()
   const log = useAuditLog()
 
-  const [rows,       setRows]       = useState([])
-  const [total,      setTotal]      = useState(0)
-  const [loading,    setLoading]    = useState(false)
-  const [error,      setError]      = useState('')
-  const [page,       setPage]       = useState(0)
-  const [search,     setSearch]     = useState('')
-  const [sort,       setSort]       = useState('created_at:asc')
+  const [rows,          setRows]          = useState([])
+  const [total,         setTotal]         = useState(0)
+  const [loading,       setLoading]       = useState(false)
+  const [error,         setError]         = useState('')
+  const [page,          setPage]          = useState(0)
+  const [search,        setSearch]        = useState('')
+  const [sort,          setSort]          = useState('created_at:asc')
+  const [statusFilter,  setStatusFilter]  = useState('pending')
 
-  const [current,    setCurrent]    = useState(null)
-  const [fileUrl,    setFileUrl]    = useState('')
-  const [loadingUrl, setLoadingUrl] = useState(false)
+  const [current,       setCurrent]       = useState(null)
+  const [fileUrl,       setFileUrl]       = useState('')
+  const [loadingUrl,    setLoadingUrl]    = useState(false)
+  const [showInlinePdf, setShowInlinePdf] = useState(false)
+  const [isPdf,         setIsPdf]         = useState(false)
+
+  // Decisão sobre o status do documento (aprovado/reprovado)
   const [obs,        setObs]        = useState('')
   const [saving,     setSaving]     = useState(false)
 
+  // Ação de workflow (fluxo de solicitação)
+  const [wfAction,     setWfAction]     = useState('')
+  const [wfNote,       setWfNote]       = useState('')
+  const [savingWf,     setSavingWf]     = useState(false)
+
   const [sortField, sortDir] = sort.split(':')
+
+  const userRole = profile?.role ?? 'auditor'
+  const allowedWfTransitions = ALLOWED_TRANSITIONS_BY_ROLE[userRole] ?? {}
+
+  const getAvailableWfActions = (currentWfStatus) => {
+    const allowed = allowedWfTransitions[currentWfStatus] ?? []
+    return AUDITOR_WF_ACTIONS.filter(a => allowed.includes(a.value))
+  }
 
   const fetchFila = useCallback(async () => {
     setLoading(true)
@@ -48,9 +93,15 @@ export default function RevisaoPage() {
       let q = supabase
         .from('prontuarios')
         .select('*, profiles!prontuarios_uploaded_by_fkey(name, role)', { count: 'exact' })
-        .eq('status', 'pending')
         .order(sortField, { ascending: sortDir === 'asc' })
         .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1)
+
+      // Filtro de status de documento
+      if (statusFilter) {
+        q = q.eq('status', statusFilter)
+      } else {
+        q = q.neq('status', 'trash')
+      }
 
       if (search.trim()) {
         q = q.or(
@@ -67,7 +118,7 @@ export default function RevisaoPage() {
     } finally {
       setLoading(false)
     }
-  }, [search, sort, page, sortField, sortDir])
+  }, [search, sort, page, statusFilter, sortField, sortDir])
 
   useEffect(() => {
     if (!authLoading && user) fetchFila()
@@ -77,13 +128,22 @@ export default function RevisaoPage() {
     setCurrent(row)
     setObs('')
     setFileUrl('')
+    setShowInlinePdf(false)
+    setIsPdf(false)
+    setWfAction('')
+    setWfNote('')
+
     if (row.file_path) {
       setLoadingUrl(true)
       try {
         const { data } = await supabase.storage
           .from('prontuarios')
           .createSignedUrl(row.file_path, 60 * 60)
-        setFileUrl(data?.signedUrl ?? '')
+        const url = data?.signedUrl ?? ''
+        setFileUrl(url)
+        // Detecta se é PDF pelo caminho ou extensão
+        const ext = (row.file_name || row.file_path || '').split('.').pop()?.toLowerCase()
+        setIsPdf(ext === 'pdf')
       } finally {
         setLoadingUrl(false)
       }
@@ -94,8 +154,12 @@ export default function RevisaoPage() {
     setCurrent(null)
     setFileUrl('')
     setObs('')
+    setShowInlinePdf(false)
+    setWfAction('')
+    setWfNote('')
   }
 
+  /** Decisão de auditoria do DOCUMENTO (approved / reproved) */
   async function decidir(novoStatus) {
     if (!current) return
     setSaving(true)
@@ -111,7 +175,6 @@ export default function RevisaoPage() {
         .eq('id', current.id)
       if (err) throw err
 
-      // FIX: usa valores válidos do enum audit_action
       await log(
         novoStatus === 'approved' ? 'approved' : 'reproved',
         `Prontuário ${current.record_number} ${novoStatus === 'approved' ? 'aprovado' : 'reprovado'}`,
@@ -128,13 +191,67 @@ export default function RevisaoPage() {
     }
   }
 
+  /** Atualiza o status de fluxo (workflow) */
+  async function updateWorkflow() {
+    if (!wfAction || !current) return
+    setSavingWf(true)
+    try {
+      const { error: err } = await supabase
+        .from('prontuarios')
+        .update({
+          workflow_status: wfAction,
+          ...(wfNote.trim() ? { workflow_note: wfNote.trim() } : {}),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', current.id)
+      if (err) throw err
+
+      const cfg = STATUS_WORKFLOW[wfAction]
+      await log(
+        'workflow_update',
+        `Workflow → "${cfg?.label ?? wfAction}" · ${current.record_number}`,
+        current.id
+      )
+
+      toast.success(`Fluxo atualizado: "${cfg?.label ?? wfAction}".`)
+      setCurrent(prev => ({ ...prev, workflow_status: wfAction }))
+      setWfAction('')
+      setWfNote('')
+      fetchFila()
+    } catch {
+      toast.error('Erro ao atualizar fluxo.')
+    } finally {
+      setSavingWf(false)
+    }
+  }
+
+  /** Download do arquivo */
+  async function handleDownload() {
+    if (!fileUrl) return
+    const a = document.createElement('a')
+    a.href = fileUrl
+    a.download = current?.file_name || 'prontuario'
+    a.target = '_blank'
+    a.click()
+    await log('download', `Download do prontuário ${current?.record_number}`, current?.id)
+  }
+
+  /** Impressão do PDF inline */
+  function handlePrint() {
+    if (!fileUrl) return
+    const w = window.open(fileUrl, '_blank')
+    w?.focus()
+    setTimeout(() => w?.print(), 1000)
+    log('print', `Impressão do prontuário ${current?.record_number}`, current?.id)
+  }
+
   const totalPages = Math.ceil(total / PAGE_SIZE)
 
   return (
     <div>
       <PageHeader
         title="Fila de Auditoria"
-        subtitle="Prontuários pendentes aguardando liberação"
+        subtitle="Analise prontuários, solicite correções e gerencie o fluxo de documentação"
         actions={
           <button onClick={fetchFila} disabled={loading} className={styles.btnRefresh}>
             <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -154,6 +271,11 @@ export default function RevisaoPage() {
           onChange={e => { setSearch(e.target.value); setPage(0) }}
           className={styles.searchInput}
         />
+        <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(0) }} className={styles.select}>
+          {STATUS_FILTER_OPTIONS.map(o => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
         <select value={sort} onChange={e => { setSort(e.target.value); setPage(0) }} className={styles.select}>
           {SORT_OPTIONS.map(o => (
             <option key={o.value} value={o.value}>{o.label}</option>
@@ -177,13 +299,13 @@ export default function RevisaoPage() {
         ) : rows.length === 0 ? (
           <EmptyState
             icon={<svg fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>}
-            title="Nenhum prontuário pendente"
-            subtitle={search ? 'Nenhum resultado para esta busca' : 'A fila de auditoria está vazia no momento'}
+            title="Nenhum prontuário encontrado"
+            subtitle={search ? 'Nenhum resultado para esta busca' : 'A fila está vazia para este filtro'}
           />
         ) : (
           <>
             <div className={styles.tableInfo}>
-              {total} prontuário{total !== 1 ? 's' : ''} aguardando auditoria
+              {total} prontuário{total !== 1 ? 's' : ''}
             </div>
             <div className={styles.tableWrap}>
               <table className={styles.table}>
@@ -193,7 +315,8 @@ export default function RevisaoPage() {
                     <th>Número</th>
                     <th>Tipo</th>
                     <th>Páginas</th>
-                    <th>Enviado por</th>
+                    <th>Status doc.</th>
+                    <th>Status fluxo</th>
                     <th>Data</th>
                     <th></th>
                   </tr>
@@ -205,7 +328,14 @@ export default function RevisaoPage() {
                       <td className={styles.tdMono}>{row.record_number || '—'}</td>
                       <td>{row.document_type || '—'}</td>
                       <td className={styles.tdCenter}>{row.pages || '—'}</td>
-                      <td>{row.profiles?.name || '—'}</td>
+                      <td>
+                        <span className={`${styles.docBadge} ${styles['doc_' + row.status]}`}>
+                          {row.status === 'approved' ? 'Liberado'
+                           : row.status === 'reproved' ? 'Não liberado'
+                           : 'Aguardando'}
+                        </span>
+                      </td>
+                      <td><WfBadge status={row.workflow_status} /></td>
                       <td className={styles.tdDate}>
                         {row.created_at
                           ? format(new Date(row.created_at), 'dd/MM/yyyy', { locale: ptBR })
@@ -258,6 +388,23 @@ export default function RevisaoPage() {
                 <div><dt>Número</dt><dd className={styles.mono}>{current.record_number || '—'}</dd></div>
                 <div><dt>Tipo</dt><dd>{current.document_type || '—'}</dd></div>
                 <div><dt>Páginas</dt><dd>{current.pages || '—'}</dd></div>
+                {current.origin_sector && (
+                  <div><dt>Setor de origem</dt><dd>{current.origin_sector}</dd></div>
+                )}
+                <div>
+                  <dt>Status do documento</dt>
+                  <dd>
+                    <span className={`${styles.docBadge} ${styles['doc_' + current.status]}`}>
+                      {current.status === 'approved' ? 'Liberado'
+                       : current.status === 'reproved' ? 'Não liberado'
+                       : 'Aguardando'}
+                    </span>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Status de fluxo</dt>
+                  <dd><WfBadge status={current.workflow_status} /></dd>
+                </div>
                 <div><dt>Enviado por</dt><dd>{current.profiles?.name || '—'}</dd></div>
                 <div className={styles.colSpan2}>
                   <dt>Enviado em</dt>
@@ -272,7 +419,6 @@ export default function RevisaoPage() {
                     <dd className={styles.preWrap}>{current.upload_note}</dd>
                   </div>
                 )}
-                {/* Mostra nota de reenvio se houver */}
                 {current.resubmit_note && (
                   <div className={styles.colSpan2}>
                     <dt className={styles.resubmitLabel}>
@@ -284,28 +430,80 @@ export default function RevisaoPage() {
                     <dd className={styles.preWrap}>{current.resubmit_note}</dd>
                   </div>
                 )}
+                {current.workflow_note && (
+                  <div className={styles.colSpan2}>
+                    <dt>Nota do fluxo</dt>
+                    <dd className={styles.preWrap}>{current.workflow_note}</dd>
+                  </div>
+                )}
               </dl>
 
+              {/* Arquivo: visualização inline + download + impressão */}
               {current.file_path && (
                 <div className={styles.fileSection}>
                   {loadingUrl ? (
                     <span className={styles.loadingText}>Gerando link…</span>
                   ) : fileUrl ? (
-                    <a href={fileUrl} target="_blank" rel="noopener noreferrer" className={styles.linkBtn}>
-                      <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                        <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                        <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                      </svg>
-                      Abrir arquivo do prontuário
-                    </a>
+                    <>
+                      <div className={styles.fileActions}>
+                        {isPdf && (
+                          <button
+                            onClick={() => setShowInlinePdf(v => !v)}
+                            className={styles.btnFileAction}
+                          >
+                            <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                              <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                              <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                            </svg>
+                            {showInlinePdf ? 'Fechar visualização' : 'Visualizar PDF'}
+                          </button>
+                        )}
+                        <a href={fileUrl} target="_blank" rel="noopener noreferrer" className={styles.btnFileAction}>
+                          <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+                            <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                          </svg>
+                          Abrir em nova aba
+                        </a>
+                        <button onClick={handleDownload} className={styles.btnFileAction}>
+                          <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                          </svg>
+                          Download
+                        </button>
+                        <button onClick={handlePrint} className={styles.btnFileAction}>
+                          <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <polyline points="6 9 6 2 18 2 18 9"/>
+                            <path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/>
+                            <rect x="6" y="14" width="12" height="8"/>
+                          </svg>
+                          Imprimir
+                        </button>
+                      </div>
+
+                      {/* Visualização inline do PDF */}
+                      {showInlinePdf && isPdf && (
+                        <div className={styles.inlinePdf}>
+                          <iframe
+                            src={fileUrl}
+                            title="Prontuário"
+                            className={styles.pdfFrame}
+                          />
+                        </div>
+                      )}
+                    </>
                   ) : (
                     <span className={styles.loadingText}>Arquivo não disponível.</span>
                   )}
                 </div>
               )}
 
+              {/* Decisão de documento (status do prontuário) */}
               <div className={styles.obsField}>
-                <label className={styles.obsLabel}>Observações da auditoria (opcional)</label>
+                <label className={styles.obsLabel}>
+                  Observações da auditoria{' '}
+                  <span className={styles.obsHint}>(opcional — aparece para o operador)</span>
+                </label>
                 <textarea
                   rows={3}
                   value={obs}
@@ -314,14 +512,49 @@ export default function RevisaoPage() {
                   className={styles.textarea}
                 />
               </div>
+
+              {/* Ações de fluxo (workflow) */}
+              {(() => {
+                const wfActions = getAvailableWfActions(current.workflow_status)
+                return wfActions.length > 0 ? (
+                  <div className={styles.wfSection}>
+                    <h4 className={styles.sectionTitle}>Atualizar fluxo de solicitação</h4>
+                    <div className={styles.wfRow}>
+                      <select value={wfAction} onChange={e => setWfAction(e.target.value)} className={styles.select}>
+                        <option value="">Selecione ação de fluxo…</option>
+                        {wfActions.map(a => (
+                          <option key={a.value} value={a.value}>{a.label}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={updateWorkflow}
+                        disabled={!wfAction || savingWf}
+                        className={styles.btnSaveWf}
+                      >
+                        {savingWf ? '…' : 'Atualizar fluxo'}
+                      </button>
+                    </div>
+                    {wfAction && (
+                      <textarea
+                        rows={2}
+                        value={wfNote}
+                        onChange={e => setWfNote(e.target.value)}
+                        placeholder="Nota sobre esta etapa do fluxo (opcional)…"
+                        className={styles.textarea}
+                        style={{ marginTop: 8 }}
+                      />
+                    )}
+                  </div>
+                ) : null
+              })()}
             </div>
 
             <div className={styles.modalFooter}>
               <button onClick={() => decidir('reproved')} disabled={saving} className={styles.btnReprovar}>
-                {saving ? '…' : '✕ Reprovar'}
+                {saving ? '…' : '✕ Reprovar documento'}
               </button>
               <button onClick={() => decidir('approved')} disabled={saving} className={styles.btnAprovar}>
-                {saving ? '…' : '✓ Aprovar'}
+                {saving ? '…' : '✓ Aprovar documento'}
               </button>
             </div>
           </div>

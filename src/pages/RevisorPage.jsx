@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/storage'
+import { STATUS_WORKFLOW, ALLOWED_TRANSITIONS_BY_ROLE } from '../lib/storage'
 import { useAuth } from '../hooks/useAuth'
 import { useAuditLog } from '../hooks/useAuditLog'
 import { format } from 'date-fns'
@@ -7,15 +8,6 @@ import { ptBR } from 'date-fns/locale'
 import toast from 'react-hot-toast'
 import { PageHeader, EmptyState } from '../components/UI'
 import styles from './RevisorPage.module.css'
-
-const WORKFLOW_LABELS = {
-  received:         { label: 'Recebida',      color: 'info'    },
-  request_approved: { label: 'Aprovada',      color: 'success' },
-  request_rejected: { label: 'Recusada',      color: 'danger'  },
-  in_production:    { label: 'Em produção',   color: 'warning' },
-  in_audit:         { label: 'Em auditoria',  color: 'purple'  },
-  delivered:        { label: 'Entregue',      color: 'success' },
-}
 
 const NOTE_TYPES = [
   { value: 'needs_contact',       label: '📞 Precisa entrar em contato' },
@@ -32,20 +24,40 @@ const SORT_OPTIONS = [
   { value: 'record_number:desc', label: 'Número (decrescente)' },
 ]
 
-const STATUS_FILTER_OPTIONS = [
-  { value: '',                 label: 'Todos os status de fluxo' },
-  { value: 'received',         label: 'Recebidas' },
-  { value: 'request_approved', label: 'Aprovadas' },
-  { value: 'request_rejected', label: 'Recusadas' },
-  { value: 'in_production',    label: 'Em produção' },
-  { value: 'in_audit',         label: 'Em auditoria' },
-  { value: 'delivered',        label: 'Entregues' },
+// Status que o Revisor gerencia (receber, aprovar, recusar)
+const REVISOR_STATUS_OPTIONS = [
+  { value: '',                  label: 'Todos os status' },
+  { value: 'received',          label: `${STATUS_WORKFLOW.received.icon} Recebidas` },
+  { value: 'request_approved',  label: `${STATUS_WORKFLOW.request_approved.icon} Aprovadas` },
+  { value: 'request_rejected',  label: `${STATUS_WORKFLOW.request_rejected.icon} Recusadas` },
+  { value: 'in_production',     label: `${STATUS_WORKFLOW.in_production.icon} Em produção` },
+  { value: 'in_audit',          label: `${STATUS_WORKFLOW.in_audit.icon} Em auditoria` },
+  { value: 'correction_needed', label: `${STATUS_WORKFLOW.correction_needed.icon} Correção solicitada` },
+  { value: 'corrected',         label: `${STATUS_WORKFLOW.corrected.icon} Corrigido` },
+  { value: 'concluded',         label: `${STATUS_WORKFLOW.concluded.icon} Concluído` },
+  { value: 'delivered',         label: `${STATUS_WORKFLOW.delivered.icon} Entregue` },
+]
+
+// Ações disponíveis para o Revisor
+const REVISOR_ACTIONS = [
+  { value: 'request_approved', label: '✅ Aprovar solicitação' },
+  { value: 'request_rejected', label: '❌ Recusar solicitação' },
 ]
 
 const PAGE_SIZE = 20
 
+function WfBadge({ status }) {
+  if (!status) return <span className={styles.badgeNone}>—</span>
+  const cfg = STATUS_WORKFLOW[status] || { label: status, color: 'info', icon: '' }
+  return (
+    <span className={`${styles.wfBadge} ${styles['wf_' + cfg.color]}`}>
+      {cfg.icon} {cfg.label}
+    </span>
+  )
+}
+
 export default function RevisorPage() {
-  const { user, loading: authLoading } = useAuth()
+  const { user, profile, loading: authLoading } = useAuth()
   const log = useAuditLog()
 
   const [rows,         setRows]         = useState([])
@@ -58,7 +70,7 @@ export default function RevisorPage() {
   const [wfFilter,     setWfFilter]     = useState('')
 
   const [selected,     setSelected]     = useState(null)
-  const [notes,        setNotes]        = useState([])
+  const [notes,        setNotes]        = useState([])\
   const [loadingNotes, setLoadingNotes] = useState(false)
 
   const [noteText,     setNoteText]     = useState('')
@@ -66,9 +78,21 @@ export default function RevisorPage() {
   const [savingNote,   setSavingNote]   = useState(false)
 
   const [wfAction,     setWfAction]     = useState('')
+  const [wfActionNote, setWfActionNote] = useState('')
   const [savingWf,     setSavingWf]     = useState(false)
 
   const [sortField, sortDir] = sort.split(':')
+
+  // Determina quais ações o usuário logado pode fazer
+  const userRole = profile?.role ?? 'revisor'
+  const allowedTransitions = ALLOWED_TRANSITIONS_BY_ROLE[userRole] ?? {}
+
+  const getAvailableActions = (currentStatus) => {
+    const allowed = allowedTransitions[currentStatus] ?? []
+    return Object.entries(STATUS_WORKFLOW)
+      .filter(([key]) => allowed.includes(key))
+      .map(([key, cfg]) => ({ value: key, label: `${cfg.icon} ${cfg.label}` }))
+  }
 
   const fetchRows = useCallback(async () => {
     setLoading(true)
@@ -108,6 +132,7 @@ export default function RevisorPage() {
     setNoteText('')
     setNoteType('needs_contact')
     setWfAction('')
+    setWfActionNote('')
     setLoadingNotes(true)
     try {
       const { data, error: err } = await supabase
@@ -139,7 +164,6 @@ export default function RevisorPage() {
         note_type:     noteType,
       })
       if (err) throw err
-      // FIX: usa 'reviewer_note' que é valor válido no enum
       await log('reviewer_note', `Nota adicionada ao prontuário ${selected.record_number}`, selected.id)
       toast.success('Nota registrada.')
       setNoteText('')
@@ -174,16 +198,29 @@ export default function RevisorPage() {
     if (!wfAction || !selected) return
     setSavingWf(true)
     try {
+      const updatePayload = {
+        workflow_status: wfAction,
+        ...(wfActionNote.trim() ? { workflow_note: wfActionNote.trim() } : {}),
+        updated_at: new Date().toISOString(),
+      }
+
       const { error: err } = await supabase
         .from('prontuarios')
-        .update({ workflow_status: wfAction })
+        .update(updatePayload)
         .eq('id', selected.id)
       if (err) throw err
-      // FIX: usa 'workflow_update' que é valor válido no enum
-      await log('workflow_update', `Workflow → "${WORKFLOW_LABELS[wfAction]?.label}" · ${selected.record_number}`, selected.id)
-      toast.success(`Status atualizado para "${WORKFLOW_LABELS[wfAction]?.label}".`)
+
+      const cfg = STATUS_WORKFLOW[wfAction]
+      await log(
+        'workflow_update',
+        `Workflow → "${cfg?.label ?? wfAction}" · ${selected.record_number}${wfActionNote.trim() ? ` | Nota: ${wfActionNote.trim()}` : ''}`,
+        selected.id
+      )
+
+      toast.success(`Status atualizado para "${cfg?.label ?? wfAction}".`)
       setSelected(prev => ({ ...prev, workflow_status: wfAction }))
       setWfAction('')
+      setWfActionNote('')
       fetchRows()
     } catch {
       toast.error('Erro ao atualizar status.')
@@ -193,18 +230,13 @@ export default function RevisorPage() {
   }
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
-
-  function WfBadge({ status }) {
-    if (!status) return <span className={styles.badgeNone}>—</span>
-    const cfg = WORKFLOW_LABELS[status] || { label: status, color: 'info' }
-    return <span className={`${styles.wfBadge} ${styles['wf_' + cfg.color]}`}>{cfg.label}</span>
-  }
+  const availableActions = selected ? getAvailableActions(selected.workflow_status) : []
 
   return (
     <div>
       <PageHeader
         title="Painel do Revisor"
-        subtitle="Acompanhe prontuários, gerencie status de solicitações e registre notas"
+        subtitle="Acompanhe prontuários, aprove/recuse solicitações e registre notas"
         actions={
           <button onClick={fetchRows} disabled={loading} className={styles.btnRefresh}>
             <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -221,8 +253,9 @@ export default function RevisorPage() {
           <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
         </svg>
         <span>
-          As <strong>solicitações de prontuários</strong> chegarão pelo portal externo (em breve).
-          Por aqui você acompanha o andamento, registra notas para o operador e atualiza o status de fluxo.
+          O Revisor <strong>recebe, aprova ou recusa</strong> solicitações de prontuários.
+          Após aprovação, o operador coloca em produção. O auditor valida e solicita
+          correções se necessário. O operador conclui e registra a entrega ao solicitante.
         </span>
       </div>
 
@@ -235,7 +268,7 @@ export default function RevisorPage() {
           className={styles.searchInput}
         />
         <select value={wfFilter} onChange={e => { setWfFilter(e.target.value); setPage(0) }} className={styles.select}>
-          {STATUS_FILTER_OPTIONS.map(o => (
+          {REVISOR_STATUS_OPTIONS.map(o => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </select>
@@ -334,6 +367,9 @@ export default function RevisorPage() {
               <dl className={styles.detailGrid}>
                 <div><dt>CPF</dt><dd className={styles.mono}>{selected.patient_cpf || '—'}</dd></div>
                 <div><dt>Páginas</dt><dd>{selected.pages || '—'}</dd></div>
+                {selected.origin_sector && (
+                  <div><dt>Setor de origem</dt><dd>{selected.origin_sector}</dd></div>
+                )}
                 <div>
                   <dt>Status do documento</dt>
                   <dd>
@@ -346,14 +382,7 @@ export default function RevisorPage() {
                 </div>
                 <div>
                   <dt>Status de fluxo</dt>
-                  <dd>
-                    {selected.workflow_status
-                      ? <span className={`${styles.wfBadge} ${styles['wf_' + (WORKFLOW_LABELS[selected.workflow_status]?.color || 'info')]}`}>
-                          {WORKFLOW_LABELS[selected.workflow_status]?.label || selected.workflow_status}
-                        </span>
-                      : <span className={styles.badgeNone}>Sem status</span>
-                    }
-                  </dd>
+                  <dd><WfBadge status={selected.workflow_status} /></dd>
                 </div>
                 <div><dt>Enviado por</dt><dd>{selected.profiles?.name || '—'}</dd></div>
                 <div>
@@ -372,29 +401,55 @@ export default function RevisorPage() {
                     <dd className={styles.preWrap}>{selected.review_note}</dd>
                   </div>
                 )}
+                {selected.workflow_note && (
+                  <div className={styles.colSpan2}>
+                    <dt>Nota do fluxo</dt>
+                    <dd className={styles.preWrap}>{selected.workflow_note}</dd>
+                  </div>
+                )}
               </dl>
 
               {/* Atualizar status de fluxo */}
               <div className={styles.section}>
                 <h4 className={styles.sectionTitle}>Atualizar status de fluxo</h4>
-                <p className={styles.sectionHint}>
-                  Registre manualmente o andamento desta solicitação.
-                </p>
-                <div className={styles.wfRow}>
-                  <select value={wfAction} onChange={e => setWfAction(e.target.value)} className={styles.select}>
-                    <option value="">Selecione o novo status…</option>
-                    {Object.entries(WORKFLOW_LABELS).map(([val, cfg]) => (
-                      <option key={val} value={val}>{cfg.label}</option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={updateWorkflow}
-                    disabled={!wfAction || savingWf}
-                    className={styles.btnSaveWf}
-                  >
-                    {savingWf ? '…' : 'Salvar'}
-                  </button>
-                </div>
+                {availableActions.length > 0 ? (
+                  <>
+                    <p className={styles.sectionHint}>
+                      Ações disponíveis para o status atual ({STATUS_WORKFLOW[selected.workflow_status]?.label ?? 'Sem status'}).
+                    </p>
+                    <div className={styles.wfRow}>
+                      <select value={wfAction} onChange={e => setWfAction(e.target.value)} className={styles.select}>
+                        <option value="">Selecione a ação…</option>
+                        {availableActions.map(a => (
+                          <option key={a.value} value={a.value}>{a.label}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={updateWorkflow}
+                        disabled={!wfAction || savingWf}
+                        className={styles.btnSaveWf}
+                      >
+                        {savingWf ? '…' : 'Salvar'}
+                      </button>
+                    </div>
+                    {wfAction && (
+                      <textarea
+                        rows={2}
+                        value={wfActionNote}
+                        onChange={e => setWfActionNote(e.target.value)}
+                        placeholder="Nota sobre esta mudança de status (opcional)…"
+                        className={styles.textarea}
+                        style={{ marginTop: 8 }}
+                      />
+                    )}
+                  </>
+                ) : (
+                  <p className={styles.sectionHint}>
+                    {selected.workflow_status
+                      ? `Status "${STATUS_WORKFLOW[selected.workflow_status]?.label}" não permite ações pelo Revisor.`
+                      : 'Nenhuma ação disponível para este status.'}
+                  </p>
+                )}
               </div>
 
               {/* Notas */}
