@@ -1,18 +1,23 @@
 /**
- * storage.js — Abstração de banco de dados / storage
+ * storage.js — Abstração completa de Supabase + Storage
  * Provider atual: Supabase
  *
- * NOVIDADES NESTA VERSÃO:
- *  - hashFile()            → SHA-256 do arquivo para detectar duplicatas
- *  - cpfHelpers            → formatação e validação de CPF
- *  - documentVersions      → histórico de uploads de um prontuário
- *  - logsService.exportCSV → gera CSV dos logs de auditoria
- *  - emailService          → estrutura pronta para notificações por email
- *  - STATUS_WORKFLOW       → mapa único de todos os status do fluxo
+ * INCLUI:
+ *  - Workflow unificado com todas as transições por role
+ *  - Hash SHA-256 + detecção de duplicatas
+ *  - Versionamento de documentos (histórico de uploads)
+ *  - Exportação CSV e XLSX de logs
+ *  - Helpers de CPF (formatação, validação, máscara)
+ *  - Configurações do sistema (lixeira automática, notificações)
+ *  - Serviço de email (estrutura pronta)
+ *  - Setor de origem e flag never_delete
  */
+
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl     = import.meta.env.VITE_SUPABASE_URL
+// ==================== CLIENTE SUPABASE ====================
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 if (!supabaseUrl || !supabaseAnonKey) {
@@ -24,7 +29,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-// ─── STATUS DE FLUXO (fonte da verdade) ──────────────────────────────────────
+// ==================== STATUS DE FLUXO UNIFICADO ====================
 //
 // Fluxo principal:
 //   received → request_approved / request_rejected
@@ -34,20 +39,20 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 // Quem pode mover para cada status:
 //   REVISOR     : received, request_approved, request_rejected
 //   OPERADOR    : in_production, not_found, corrected, concluded, delivered
-//   AUDITOR     : in_audit, correction_needed, corrected (também pode)
+//   AUDITOR     : in_audit, correction_needed, corrected, concluded
 //   ADMIN       : todos
 
 export const STATUS_WORKFLOW = {
-  received:          { label: 'Recebida',            color: 'info',    icon: '📥' },
-  request_approved:  { label: 'Solicitação aprovada', color: 'success', icon: '✅' },
-  request_rejected:  { label: 'Solicitação recusada', color: 'danger',  icon: '❌' },
-  in_production:     { label: 'Em produção',          color: 'warning', icon: '⚙️' },
-  not_found:         { label: 'Não localizado',       color: 'danger',  icon: '🔍' },
-  in_audit:          { label: 'Em auditoria',         color: 'purple',  icon: '🔎' },
-  correction_needed: { label: 'Correção solicitada',  color: 'orange',  icon: '✏️' },
-  corrected:         { label: 'Corrigido',            color: 'info',    icon: '🔄' },
-  concluded:         { label: 'Concluído',            color: 'success', icon: '🏁' },
-  delivered:         { label: 'Entregue',             color: 'success', icon: '📦' },
+  received:          { label: 'Recebida',            color: 'info',    icon: '📥', order: 1 },
+  request_approved:  { label: 'Solicitação Aprovada', color: 'success', icon: '✅', order: 2 },
+  request_rejected:  { label: 'Solicitação Recusada', color: 'danger',  icon: '❌', order: 2 },
+  in_production:     { label: 'Em Produção',          color: 'warning', icon: '⚙️', order: 3 },
+  not_found:         { label: 'Não Localizado',       color: 'danger',  icon: '🔍', order: 3 },
+  in_audit:          { label: 'Em Auditoria',         color: 'purple',  icon: '🔎', order: 4 },
+  correction_needed: { label: 'Correção Solicitada',  color: 'orange',  icon: '✏️', order: 5 },
+  corrected:         { label: 'Corrigido',            color: 'info',    icon: '🔄', order: 6 },
+  concluded:         { label: 'Concluído',            color: 'success', icon: '🏁', order: 7 },
+  delivered:         { label: 'Entregue',             color: 'success', icon: '📦', order: 8 },
 }
 
 // Transições permitidas por role
@@ -58,18 +63,16 @@ export const ALLOWED_TRANSITIONS_BY_ROLE = {
     request_rejected: [],
   },
   operador: {
-    request_approved: ['in_production'],
-    in_production:    ['in_audit', 'not_found'],
-    corrected:        ['in_audit'],
-    concluded:        ['delivered'],
-    in_audit:         [],
-    // Operador pode marcar como concluído após auditoria OK
-    // O auditor sinaliza via correction_needed ou approved (doc status)
+    request_approved:  ['in_production'],
+    in_production:     ['in_audit', 'not_found'],
+    correction_needed: ['corrected'],
+    corrected:         ['in_audit'],
+    concluded:         ['delivered'],
   },
   auditor: {
-    in_audit:         ['correction_needed', 'concluded'],
-    corrected:        ['concluded'],
-    correction_needed: ['corrected'], // auditor também pode marcar como corrigido
+    in_audit:          ['correction_needed', 'concluded'],
+    corrected:         ['concluded'],
+    correction_needed: ['corrected'],
   },
   admin: Object.keys(STATUS_WORKFLOW).reduce((acc, k) => {
     acc[k] = Object.keys(STATUS_WORKFLOW).filter(s => s !== k)
@@ -77,7 +80,7 @@ export const ALLOWED_TRANSITIONS_BY_ROLE = {
   }, {}),
 }
 
-// ─── HELPERS DE CPF ──────────────────────────────────────────────────────────
+// ==================== HELPERS DE CPF ====================
 
 export const cpfHelpers = {
   /** Remove tudo que não é dígito */
@@ -97,7 +100,7 @@ export const cpfHelpers = {
   isValid: (cpf) => {
     const d = cpfHelpers.strip(cpf)
     if (d.length !== 11) return false
-    if (/^(\d)\1{10}$/.test(d)) return false // todos iguais
+    if (/^(\d)\1{10}$/.test(d)) return false
 
     let sum = 0
     for (let i = 0; i < 9; i++) sum += parseInt(d[i]) * (10 - i)
@@ -122,7 +125,7 @@ export const cpfHelpers = {
   },
 }
 
-// ─── HASH DE ARQUIVO ─────────────────────────────────────────────────────────
+// ==================== HASH DE ARQUIVO + DUPLICATAS ====================
 
 /**
  * Calcula SHA-256 de um File ou Blob.
@@ -152,7 +155,7 @@ export async function checkDuplicateHash(hash) {
   return data ?? null
 }
 
-// ─── AUTH ────────────────────────────────────────────────────────────────────
+// ==================== AUTH ====================
 
 export const authService = {
   signIn: (email, password) =>
@@ -180,7 +183,34 @@ export const authService = {
     supabase.auth.onAuthStateChange(callback),
 }
 
-// ─── PRONTUÁRIOS ─────────────────────────────────────────────────────────────
+// ==================== STORAGE (ARQUIVOS) ====================
+
+export const storageService = {
+  upload: async (file, path) => {
+    const { data, error } = await supabase.storage
+      .from('prontuarios')
+      .upload(path, file, { upsert: false, cacheControl: '3600' })
+    if (error) throw error
+    return data
+  },
+
+  getSignedUrl: async (path, expiresIn = 3600) => {
+    const { data, error } = await supabase.storage
+      .from('prontuarios')
+      .createSignedUrl(path, expiresIn)
+    if (error) throw error
+    return data.signedUrl
+  },
+
+  remove: async (paths) => {
+    const { error } = await supabase.storage
+      .from('prontuarios')
+      .remove(Array.isArray(paths) ? paths : [paths])
+    if (error) throw error
+  },
+}
+
+// ==================== PRONTUÁRIOS ====================
 
 export const prontuariosService = {
   list: ({ search = '', status = null, workflowStatus = null, originSector = null, page = 1, perPage = 20 } = {}) => {
@@ -208,7 +238,6 @@ export const prontuariosService = {
       .eq('id', id)
       .single(),
 
-  // FIX: insert separado do select para não colidir com RLS de operadores
   create: async (data) => {
     const { error: insertError } = await supabase
       .from('prontuarios')
@@ -220,6 +249,49 @@ export const prontuariosService = {
       .select('*')
       .eq('record_number', data.record_number)
       .single()
+  },
+
+  /**
+   * Cria prontuário com hash, upload e primeira versão automática
+   */
+  createWithVersion: async (file, metadata) => {
+    // 1. Calcula hash e verifica duplicata
+    const fileHash = await hashFile(file)
+    const duplicate = await checkDuplicateHash(fileHash)
+    if (duplicate) {
+      throw new Error(
+        `Documento duplicado! Já existe como prontuário ${duplicate.record_number} (${duplicate.patient_name})`
+      )
+    }
+
+    // 2. Upload do arquivo
+    const ext = file.name.split('.').pop()
+    const path = `${metadata.uploaded_by}/${Date.now()}_${metadata.record_number}.${ext}`
+    await storageService.upload(file, path)
+
+    // 3. Insere registro no banco
+    const { data: prontuario, error } = await prontuariosService.create({
+      ...metadata,
+      file_path: path,
+      file_name: file.name,
+      file_size: file.size,
+      file_hash: fileHash,
+      status: 'pending',
+    })
+    if (error) throw error
+
+    // 4. Cria primeira versão no histórico
+    await documentVersionsService.create({
+      prontuario_id: prontuario.id,
+      version_number: 1,
+      file_path: path,
+      file_name: file.name,
+      file_size: file.size,
+      file_hash: fileHash,
+      uploaded_by: metadata.uploaded_by,
+    })
+
+    return prontuario
   },
 
   updateStatus: (id, status, reviewNote = null) =>
@@ -247,6 +319,50 @@ export const prontuariosService = {
       .select()
       .single(),
 
+  /**
+   * Reenvia prontuário corrigido (nova versão)
+   */
+  resubmit: async (prontuarioId, file, note, userId) => {
+    const fileHash = await hashFile(file)
+    const ext = file.name.split('.').pop()
+    const path = `${userId}/${Date.now()}_resubmit.${ext}`
+    
+    await storageService.upload(file, path)
+
+    const nextVersion = await documentVersionsService.nextVersion(prontuarioId)
+
+    // Atualiza prontuário
+    const { error } = await supabase
+      .from('prontuarios')
+      .update({
+        status: 'pending',
+        file_path: path,
+        file_name: file.name,
+        file_size: file.size,
+        file_hash: fileHash,
+        resubmit_note: note?.trim() || null,
+        reviewed_at: null,
+        reviewed_by: null,
+        review_note: null,
+      })
+      .eq('id', prontuarioId)
+    if (error) throw error
+
+    // Registra nova versão
+    await documentVersionsService.create({
+      prontuario_id: prontuarioId,
+      version_number: nextVersion,
+      file_path: path,
+      file_name: file.name,
+      file_size: file.size,
+      file_hash: fileHash,
+      uploaded_by: userId,
+      upload_note: note,
+    })
+
+    return true
+  },
+
   softDelete: (id) =>
     supabase
       .from('prontuarios')
@@ -259,8 +375,19 @@ export const prontuariosService = {
       .update({ status: 'pending', deleted_at: null })
       .eq('id', id),
 
-  hardDelete: (id) =>
-    supabase.from('prontuarios').delete().eq('id', id),
+  hardDelete: async (id) => {
+    // Busca todas as versões para remover arquivos
+    const { data: versions } = await documentVersionsService.list(id)
+    const paths = (versions || []).map(v => v.file_path).filter(Boolean)
+    
+    // Remove arquivos do storage
+    if (paths.length > 0) {
+      await storageService.remove(paths)
+    }
+
+    // Remove registro
+    return supabase.from('prontuarios').delete().eq('id', id)
+  },
 
   /** Lista os setores distintos cadastrados (para filtros e dropdowns) */
   listSectors: async () => {
@@ -274,14 +401,12 @@ export const prontuariosService = {
   },
 }
 
-// ─── VERSÕES DE DOCUMENTO ────────────────────────────────────────────────────
+// ==================== VERSÕES DE DOCUMENTO ====================
 // Histórico completo de uploads de um prontuário (arquivo original + reenvios)
 
 export const documentVersionsService = {
   /**
    * Lista todas as versões de um prontuário em ordem decrescente.
-   * Tabela esperada: document_versions (id, prontuario_id, file_path, file_name,
-   *   file_size, file_hash, version_number, uploaded_by, upload_note, created_at)
    */
   list: (prontuarioId) =>
     supabase
@@ -310,34 +435,7 @@ export const documentVersionsService = {
   },
 }
 
-// ─── STORAGE (arquivos) ──────────────────────────────────────────────────────
-
-export const storageService = {
-  upload: async (file, path) => {
-    const { data, error } = await supabase.storage
-      .from('prontuarios')
-      .upload(path, file, { upsert: false, cacheControl: '3600' })
-    if (error) throw error
-    return data
-  },
-
-  getSignedUrl: async (path, expiresIn = 3600) => {
-    const { data, error } = await supabase.storage
-      .from('prontuarios')
-      .createSignedUrl(path, expiresIn)
-    if (error) throw error
-    return data.signedUrl
-  },
-
-  remove: async (paths) => {
-    const { error } = await supabase.storage
-      .from('prontuarios')
-      .remove(Array.isArray(paths) ? paths : [paths])
-    if (error) throw error
-  },
-}
-
-// ─── LOGS DE AUDITORIA ───────────────────────────────────────────────────────
+// ==================== LOGS DE AUDITORIA ====================
 
 export const logsService = {
   list: ({ type = null, userId = null, search = '', page = 1, perPage = 50, dateFrom = null, dateTo = null } = {}) => {
@@ -347,11 +445,11 @@ export const logsService = {
       .order('created_at', { ascending: false })
       .range((page - 1) * perPage, page * perPage - 1)
 
-    if (type)   query = query.eq('action_type', type)
+    if (type) query = query.eq('action_type', type)
     if (userId) query = query.eq('user_id', userId)
     if (search) query = query.ilike('detail', `%${search}%`)
     if (dateFrom) query = query.gte('created_at', dateFrom)
-    if (dateTo)   query = query.lte('created_at', dateTo)
+    if (dateTo) query = query.lte('created_at', dateTo)
     return query
   },
 
@@ -394,9 +492,40 @@ export const logsService = {
     a.click()
     URL.revokeObjectURL(url)
   },
+
+  /**
+   * Exporta logs para XLSX e dispara o download no browser.
+   * Requer biblioteca xlsx (npm install xlsx)
+   * @param {object} filters - mesmos filtros de list()
+   * @param {string} filename
+   */
+  exportXLSX: async (filters = {}, filename = 'logs_auditoria.xlsx') => {
+    try {
+      const XLSX = await import('xlsx')
+      const { data, error } = await logsService.list({ ...filters, perPage: 5000 })
+      if (error) throw error
+
+      const rows = (data ?? []).map(l => ({
+        'Data/Hora': new Date(l.created_at).toLocaleString('pt-BR'),
+        'Usuário': l.profiles?.name ?? '',
+        'Role': l.profiles?.role ?? '',
+        'Ação': l.action_type,
+        'Detalhe': l.detail ?? '',
+        'ID Prontuário': l.prontuario_id ?? '',
+      }))
+
+      const ws = XLSX.utils.json_to_sheet(rows)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Logs')
+      XLSX.writeFile(wb, filename)
+    } catch {
+      // Fallback para CSV se xlsx não estiver disponível
+      await logsService.exportCSV(filters, filename.replace('.xlsx', '.csv'))
+    }
+  },
 }
 
-// ─── USUÁRIOS / PERFIS ────────────────────────────────────────────────────────
+// ==================== USUÁRIOS / PERFIS ====================
 
 export const profilesService = {
   list: () =>
@@ -421,7 +550,7 @@ export const profilesService = {
     }),
 }
 
-// ─── NOTAS DO REVISOR ────────────────────────────────────────────────────────
+// ==================== NOTAS DO REVISOR ====================
 
 export const reviewerNotesService = {
   listByProntuario: (prontuarioId) =>
@@ -449,7 +578,7 @@ export const reviewerNotesService = {
     supabase.from('reviewer_notes').update({ resolved: true }).eq('id', id),
 }
 
-// ─── WORKFLOW ────────────────────────────────────────────────────────────────
+// ==================== WORKFLOW ====================
 
 export const workflowService = {
   updateStatus: (prontuarioId, workflowStatus, note = null) =>
@@ -472,7 +601,7 @@ export const workflowService = {
       .order('updated_at', { ascending: false }),
 }
 
-// ─── CONFIGURAÇÕES DO SISTEMA ────────────────────────────────────────────────
+// ==================== CONFIGURAÇÕES DO SISTEMA ====================
 // Tabela esperada: system_config (key text PK, value jsonb, updated_at, updated_by)
 
 export const systemConfigService = {
@@ -504,12 +633,12 @@ export const systemConfigService = {
   // Chaves de configuração conhecidas:
   // 'trash_auto_days'     → number (dias até exclusão automática da lixeira, 0 = desativado)
   // 'email_notifications' → boolean
-  // 'smtp_host'           → string  (nunca armazenar senha aqui — use secrets do Supabase)
+  // 'smtp_host'           → string
   // 'smtp_port'           → number
   // 'smtp_from'           → string
 }
 
-// ─── SERVIÇO DE EMAIL (estrutura pronta — integrar com Edge Function) ─────────
+// ==================== SERVIÇO DE EMAIL ====================
 //
 // Para ativar: crie a Edge Function 'send-email' e configure as variáveis
 //   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM nos secrets do Supabase.

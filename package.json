@@ -23,7 +23,8 @@
     "react-dropzone": "^15.0.0",
     "react-hot-toast": "^2.6.0",
     "react-router-dom": "^7.15.0",
-    "tailwind-merge": "^2.5.2"
+    "tailwind-merge": "^2.5.2",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/react": "^18.3.10",

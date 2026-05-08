@@ -4,38 +4,120 @@
   gap: 16px;
 }
 
+/* ─── DROP ZONE ─────────────────────────────────────────────── */
 .dropZone {
   border: 2px dashed var(--border);
   border-radius: 10px;
   padding: 48px 24px;
   text-align: center;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.2s;
   background: var(--surface);
+  position: relative;
 }
-.dropZone:hover, .dropZone.drag {
+.dropZone:hover,
+.dropZone.drag {
   border-color: var(--accent);
   background: var(--accent-light);
 }
 .dropZone.hasFile {
   border-color: var(--accent);
   background: var(--accent-light);
+  border-style: solid;
 }
-.dropZone svg {
-  width: 40px;
-  height: 40px;
-  color: var(--text3);
+
+/* Ícone de upload */
+.uploadIcon {
+  font-size: 48px;
   margin-bottom: 12px;
+  line-height: 1;
 }
-.dropZone.hasFile svg { color: var(--accent); }
-.dropZone p {
+
+/* Título do dropzone */
+.uploadTitle {
   font-size: 15px;
   color: var(--text2);
   font-weight: 500;
+  margin-bottom: 4px;
 }
-.dropZone.hasFile p { color: var(--accent); }
-.dropZone span { font-size: 12px; color: var(--text3); display: block; margin-top: 4px; }
 
+/* Texto de dica */
+.uploadHint {
+  font-size: 12px;
+  color: var(--text3);
+  display: block;
+  margin-top: 4px;
+}
+
+/* Ícone do arquivo selecionado */
+.fileIcon {
+  font-size: 40px;
+  margin-bottom: 8px;
+}
+
+/* Nome do arquivo */
+.fileName {
+  font-size: 15px;
+  color: var(--accent);
+  font-weight: 500;
+  margin-bottom: 4px;
+  word-break: break-all;
+}
+
+/* Tamanho do arquivo */
+.fileSize {
+  font-size: 12px;
+  color: var(--text3);
+  display: block;
+  margin-top: 4px;
+}
+
+/* Botão remover arquivo */
+.removeFile {
+  margin-top: 12px;
+  padding: 6px 14px;
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+  background: var(--danger-light);
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.removeFile:hover {
+  background: var(--danger);
+  color: #fff;
+}
+
+/* ─── BARRA DE PROGRESSO ────────────────────────────────────── */
+.progressBar {
+  margin-top: 16px;
+  width: 100%;
+  height: 8px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 4px;
+  transition: width 0.5s ease;
+  min-width: 0;
+}
+
+.progressText {
+  display: block;
+  font-size: 12px;
+  color: var(--text2);
+  margin-top: 6px;
+  text-align: center;
+}
+
+/* ─── FIELDS CARD ───────────────────────────────────────────── */
 .fieldsCard {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -49,8 +131,11 @@
   gap: 0 16px;
 }
 
-.fullCol { grid-column: 1 / -1; }
+.fullCol {
+  grid-column: 1 / -1;
+}
 
+/* ─── TOGGLE ────────────────────────────────────────────────── */
 .toggleRow {
   display: flex;
   align-items: center;
@@ -59,11 +144,29 @@
   border-top: 1px solid var(--border);
   gap: 16px;
 }
-.toggleRow label:first-child { font-size: 14px; font-weight: 500; }
-.toggleRow small { font-size: 12px; color: var(--text2); display: block; margin-top: 2px; }
+.toggleRow label:first-child {
+  font-size: 14px;
+  font-weight: 500;
+}
+.toggleRow small {
+  font-size: 12px;
+  color: var(--text2);
+  display: block;
+  margin-top: 2px;
+}
 
-.toggle { position: relative; width: 38px; height: 22px; flex-shrink: 0; cursor: pointer; }
-.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
 .toggleSlider {
   position: absolute;
   inset: 0;
@@ -75,22 +178,82 @@
 .toggleSlider::before {
   content: '';
   position: absolute;
-  width: 16px; height: 16px;
-  left: 3px; top: 3px;
+  width: 16px;
+  height: 16px;
+  left: 3px;
+  top: 3px;
   background: #fff;
   border-radius: 50%;
   transition: 0.2s;
 }
-.toggle input:checked + .toggleSlider { background: var(--accent); }
-.toggle input:checked + .toggleSlider::before { transform: translateX(16px); }
+.toggle input:checked + .toggleSlider {
+  background: var(--accent);
+}
+.toggle input:checked + .toggleSlider::before {
+  transform: translateX(16px);
+}
+/* Desabilitado */
+.toggle input:disabled + .toggleSlider {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
+/* ─── CUSTOM SECTOR ─────────────────────────────────────────── */
+.customSectorRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.customSectorRow input {
+  flex: 1;
+}
+.btnClearSector {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text2);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.btnClearSector:hover {
+  background: var(--danger-light);
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+/* ─── FIELD ERROR ───────────────────────────────────────────── */
+.fieldError {
+  display: block;
+  font-size: 12px;
+  color: var(--danger);
+  margin-top: 4px;
+  margin-bottom: 2px;
+}
+
+.inputError {
+  border-color: var(--danger) !important;
+  background: var(--danger-light) !important;
+}
+.inputError:focus {
+  border-color: var(--danger) !important;
+  box-shadow: 0 0 0 3px rgba(192, 57, 43, 0.15) !important;
+}
+
+/* ─── FORM ACTIONS ──────────────────────────────────────────── */
 .formActions {
   display: flex;
   gap: 10px;
   margin-top: 20px;
 }
 
-/* Success */
+/* ─── SUCCESS ───────────────────────────────────────────────── */
 .successCard {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -98,8 +261,12 @@
   padding: 60px 24px;
   text-align: center;
 }
+.successCard strong {
+  color: var(--accent);
+}
 .checkCircle {
-  width: 64px; height: 64px;
+  width: 64px;
+  height: 64px;
   background: var(--accent-light);
   border-radius: 50%;
   display: flex;
@@ -107,6 +274,43 @@
   justify-content: center;
   margin: 0 auto 20px;
 }
-.checkCircle svg { width: 28px; height: 28px; color: var(--accent); }
-.successCard h3 { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
-.successCard p  { font-size: 14px; color: var(--text2); margin-bottom: 24px; }
+.checkCircle svg {
+  width: 28px;
+  height: 28px;
+  color: var(--accent);
+}
+.successCard h3 {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.successCard p {
+  font-size: 14px;
+  color: var(--text2);
+  margin-bottom: 24px;
+  line-height: 1.6;
+}
+
+/* ─── RESPONSIVO ────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .fieldsGrid {
+    grid-template-columns: 1fr;
+  }
+  
+  .dropZone {
+    padding: 32px 16px;
+  }
+  
+  .uploadIcon {
+    font-size: 36px;
+  }
+  
+  .formActions {
+    flex-direction: column;
+  }
+  
+  .formActions button {
+    width: 100%;
+    justify-content: center;
+  }
+}
