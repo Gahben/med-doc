@@ -314,3 +314,28 @@
     justify-content: center;
   }
 }
+
+/* ─── CPF INPUT ────────────────────────────────────────────── */
+.inputCpf {
+  letter-spacing: 0.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.fieldError {
+  display: block;
+  font-size: 11px;
+  color: var(--danger);
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+.inputError {
+  border-color: var(--danger) !important;
+  box-shadow: 0 0 0 3px rgba(192, 57, 43, 0.1) !important;
+}
+
+/* CPF formatado visualmente */
+.cpfFormatted {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  letter-spacing: 1px;
+}

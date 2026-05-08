@@ -22,12 +22,13 @@ const SORT_OPTIONS = [
   { value: 'pages:asc',          label: 'Menos páginas primeiro' },
 ]
 
-// Filtro de status de documento para a fila de auditoria
-const STATUS_FILTER_OPTIONS = [
-  { value: 'pending',  label: 'Aguardando auditoria' },
-  { value: 'approved', label: 'Liberados' },
-  { value: 'reproved', label: 'Não liberados' },
-  { value: '',         label: 'Todos (exceto lixeira)' },
+// Filtro de workflow para auditoria (substitui o antigo STATUS_FILTER_OPTIONS)
+const WORKFLOW_FILTER_OPTIONS = [
+  { value: '',                  label: 'Todos os status' },
+  { value: 'in_audit',          label: '🔎 Em auditoria' },
+  { value: 'correction_needed', label: '✏️ Correção solicitada' },
+  { value: 'corrected',         label: '🔄 Corrigido' },
+  { value: 'concluded',         label: '🏁 Concluído' },
 ]
 
 // Ações do auditor sobre o workflow (não o status do documento)
@@ -59,17 +60,13 @@ export default function RevisaoPage() {
   const [page,          setPage]          = useState(0)
   const [search,        setSearch]        = useState('')
   const [sort,          setSort]          = useState('created_at:asc')
-  const [statusFilter,  setStatusFilter]  = useState('pending')
+  const [workflowFilter,  setWorkflowFilter]  = useState('')
 
   const [current,       setCurrent]       = useState(null)
   const [fileUrl,       setFileUrl]       = useState('')
   const [loadingUrl,    setLoadingUrl]    = useState(false)
   const [showInlinePdf, setShowInlinePdf] = useState(false)
   const [isPdf,         setIsPdf]         = useState(false)
-
-  // Decisão sobre o status do documento (aprovado/reprovado)
-  const [obs,        setObs]        = useState('')
-  const [saving,     setSaving]     = useState(false)
 
   // Ação de workflow (fluxo de solicitação)
   const [wfAction,     setWfAction]     = useState('')
@@ -97,8 +94,8 @@ export default function RevisaoPage() {
         .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1)
 
       // Filtro de status de documento
-      if (statusFilter) {
-        q = q.eq('status', statusFilter)
+      if (workflowFilter) {
+        q = q.eq('status', workflowFilter)
       } else {
         q = q.neq('status', 'trash')
       }
@@ -118,7 +115,7 @@ export default function RevisaoPage() {
     } finally {
       setLoading(false)
     }
-  }, [search, sort, page, statusFilter, sortField, sortDir])
+  }, [search, sort, page, workflowFilter, sortField, sortDir])
 
   useEffect(() => {
     if (!authLoading && user) fetchFila()
@@ -126,7 +123,6 @@ export default function RevisaoPage() {
 
   async function openReview(row) {
     setCurrent(row)
-    setObs('')
     setFileUrl('')
     setShowInlinePdf(false)
     setIsPdf(false)
@@ -153,77 +149,58 @@ export default function RevisaoPage() {
   function closeReview() {
     setCurrent(null)
     setFileUrl('')
-    setObs('')
     setShowInlinePdf(false)
     setWfAction('')
     setWfNote('')
   }
 
-  /** Decisão de auditoria do DOCUMENTO (approved / reproved) */
-  async function decidir(novoStatus) {
-    if (!current) return
-    setSaving(true)
-    try {
-      const { error: err } = await supabase
-        .from('prontuarios')
-        .update({
-          status:      novoStatus,
-          reviewed_at: new Date().toISOString(),
-          reviewed_by: user.id,
-          ...(obs.trim() ? { review_note: obs.trim() } : {}),
-        })
-        .eq('id', current.id)
-      if (err) throw err
-
-      await log(
-        novoStatus === 'approved' ? 'approved' : 'reproved',
-        `Prontuário ${current.record_number} ${novoStatus === 'approved' ? 'aprovado' : 'reprovado'}`,
-        current.id
-      )
-
-      toast.success(novoStatus === 'approved' ? '✓ Prontuário aprovado.' : '✕ Prontuário reprovado.')
-      closeReview()
-      fetchFila()
-    } catch {
-      toast.error('Erro ao salvar. Tente novamente.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
   /** Atualiza o status de fluxo (workflow) */
   async function updateWorkflow() {
-    if (!wfAction || !current) return
-    setSavingWf(true)
-    try {
-      const { error: err } = await supabase
-        .from('prontuarios')
-        .update({
-          workflow_status: wfAction,
-          ...(wfNote.trim() ? { workflow_note: wfNote.trim() } : {}),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', current.id)
-      if (err) throw err
-
-      const cfg = STATUS_WORKFLOW[wfAction]
-      await log(
-        'workflow_update',
-        `Workflow → "${cfg?.label ?? wfAction}" · ${current.record_number}`,
-        current.id
-      )
-
-      toast.success(`Fluxo atualizado: "${cfg?.label ?? wfAction}".`)
-      setCurrent(prev => ({ ...prev, workflow_status: wfAction }))
-      setWfAction('')
-      setWfNote('')
-      fetchFila()
-    } catch {
-      toast.error('Erro ao atualizar fluxo.')
-    } finally {
-      setSavingWf(false)
+  if (!wfAction || !current) return
+  setSavingWf(true)
+  try {
+    // Mapeia workflow → document status
+    const docStatusMap = {
+      'concluded': 'approved',
+      'correction_needed': 'reproved',
     }
+
+    const updatePayload = {
+      workflow_status: wfAction,
+      ...(wfNote.trim() ? { workflow_note: wfNote.trim() } : {}),
+      updated_at: new Date().toISOString(),
+    }
+
+    if (docStatusMap[wfAction]) {
+      updatePayload.status = docStatusMap[wfAction]
+      updatePayload.reviewed_at = new Date().toISOString()
+      updatePayload.reviewed_by = user.id
+    }
+
+    const { error: err } = await supabase
+      .from('prontuarios')
+      .update(updatePayload)
+      .eq('id', current.id)
+    if (err) throw err
+
+    const cfg = STATUS_WORKFLOW[wfAction]
+    await log('workflow_update', `Workflow → "${cfg?.label}" · ${current.record_number}`, current.id)
+
+    toast.success(`Fluxo: "${cfg?.label}".`)
+    setCurrent(prev => ({ 
+      ...prev, 
+      workflow_status: wfAction,
+      ...(docStatusMap[wfAction] ? { status: docStatusMap[wfAction] } : {})
+    }))
+    setWfAction('')
+    setWfNote('')
+    fetchFila()
+  } catch {
+    toast.error('Erro ao atualizar fluxo.')
+  } finally {
+    setSavingWf(false)
   }
+}
 
   /** Download do arquivo */
   async function handleDownload() {
@@ -271,8 +248,8 @@ export default function RevisaoPage() {
           onChange={e => { setSearch(e.target.value); setPage(0) }}
           className={styles.searchInput}
         />
-        <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(0) }} className={styles.select}>
-          {STATUS_FILTER_OPTIONS.map(o => (
+        <select value={workflowFilter} onChange={e => { setWorkflowFilter(e.target.value); setPage(0) }} className={styles.select}>
+          {WORKFLOW_FILTER_OPTIONS.map(o => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </select>
@@ -315,7 +292,6 @@ export default function RevisaoPage() {
                     <th>Número</th>
                     <th>Tipo</th>
                     <th>Páginas</th>
-                    <th>Status doc.</th>
                     <th>Status fluxo</th>
                     <th>Data</th>
                     <th></th>
@@ -328,13 +304,6 @@ export default function RevisaoPage() {
                       <td className={styles.tdMono}>{row.record_number || '—'}</td>
                       <td>{row.document_type || '—'}</td>
                       <td className={styles.tdCenter}>{row.pages || '—'}</td>
-                      <td>
-                        <span className={`${styles.docBadge} ${styles['doc_' + row.status]}`}>
-                          {row.status === 'approved' ? 'Liberado'
-                           : row.status === 'reproved' ? 'Não liberado'
-                           : 'Aguardando'}
-                        </span>
-                      </td>
                       <td><WfBadge status={row.workflow_status} /></td>
                       <td className={styles.tdDate}>
                         {row.created_at
@@ -391,16 +360,6 @@ export default function RevisaoPage() {
                 {current.origin_sector && (
                   <div><dt>Setor de origem</dt><dd>{current.origin_sector}</dd></div>
                 )}
-                <div>
-                  <dt>Status do documento</dt>
-                  <dd>
-                    <span className={`${styles.docBadge} ${styles['doc_' + current.status]}`}>
-                      {current.status === 'approved' ? 'Liberado'
-                       : current.status === 'reproved' ? 'Não liberado'
-                       : 'Aguardando'}
-                    </span>
-                  </dd>
-                </div>
                 <div>
                   <dt>Status de fluxo</dt>
                   <dd><WfBadge status={current.workflow_status} /></dd>
@@ -498,21 +457,6 @@ export default function RevisaoPage() {
                 </div>
               )}
 
-              {/* Decisão de documento (status do prontuário) */}
-              <div className={styles.obsField}>
-                <label className={styles.obsLabel}>
-                  Observações da auditoria{' '}
-                  <span className={styles.obsHint}>(opcional — aparece para o operador)</span>
-                </label>
-                <textarea
-                  rows={3}
-                  value={obs}
-                  onChange={e => setObs(e.target.value)}
-                  placeholder="Justificativa da decisão, pendências, páginas com problema…"
-                  className={styles.textarea}
-                />
-              </div>
-
               {/* Ações de fluxo (workflow) */}
               {(() => {
                 const wfActions = getAvailableWfActions(current.workflow_status)
@@ -547,15 +491,6 @@ export default function RevisaoPage() {
                   </div>
                 ) : null
               })()}
-            </div>
-
-            <div className={styles.modalFooter}>
-              <button onClick={() => decidir('reproved')} disabled={saving} className={styles.btnReprovar}>
-                {saving ? '…' : '✕ Reprovar documento'}
-              </button>
-              <button onClick={() => decidir('approved')} disabled={saving} className={styles.btnAprovar}>
-                {saving ? '…' : '✓ Aprovar documento'}
-              </button>
             </div>
           </div>
         </div>

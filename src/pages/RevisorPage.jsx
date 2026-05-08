@@ -195,39 +195,55 @@ export default function RevisorPage() {
   }
 
   async function updateWorkflow() {
-    if (!wfAction || !selected) return
-    setSavingWf(true)
-    try {
-      const updatePayload = {
-        workflow_status: wfAction,
-        ...(wfActionNote.trim() ? { workflow_note: wfActionNote.trim() } : {}),
-        updated_at: new Date().toISOString(),
-      }
-
-      const { error: err } = await supabase
-        .from('prontuarios')
-        .update(updatePayload)
-        .eq('id', selected.id)
-      if (err) throw err
-
-      const cfg = STATUS_WORKFLOW[wfAction]
-      await log(
-        'workflow_update',
-        `Workflow → "${cfg?.label ?? wfAction}" · ${selected.record_number}${wfActionNote.trim() ? ` | Nota: ${wfActionNote.trim()}` : ''}`,
-        selected.id
-      )
-
-      toast.success(`Status atualizado para "${cfg?.label ?? wfAction}".`)
-      setSelected(prev => ({ ...prev, workflow_status: wfAction }))
-      setWfAction('')
-      setWfActionNote('')
-      fetchRows()
-    } catch {
-      toast.error('Erro ao atualizar status.')
-    } finally {
-      setSavingWf(false)
+  if (!wfAction || !selected) return
+  setSavingWf(true)
+  try {
+    // Mapeia workflow_status → document status
+    const docStatusMap = {
+      'request_approved': 'approved',
+      'request_rejected': 'reproved',
+      'received': 'pending',
     }
+
+    const updatePayload = {
+      workflow_status: wfAction,
+      ...(wfActionNote.trim() ? { workflow_note: wfActionNote.trim() } : {}),
+      updated_at: new Date().toISOString(),
+    }
+
+    // Se for ação do revisor, também atualiza status do documento
+    if (docStatusMap[wfAction]) {
+      updatePayload.status = docStatusMap[wfAction]
+      if (wfAction === 'request_approved' || wfAction === 'request_rejected') {
+        updatePayload.reviewed_at = new Date().toISOString()
+        updatePayload.reviewed_by = user.id
+      }
+    }
+
+    const { error: err } = await supabase
+      .from('prontuarios')
+      .update(updatePayload)
+      .eq('id', selected.id)
+    if (err) throw err
+
+    const cfg = STATUS_WORKFLOW[wfAction]
+    await log('workflow_update', `Workflow → "${cfg?.label}" · ${selected.record_number}`, selected.id)
+
+    toast.success(`Status atualizado: "${cfg?.label}".`)
+    setSelected(prev => ({ 
+      ...prev, 
+      workflow_status: wfAction,
+      ...(docStatusMap[wfAction] ? { status: docStatusMap[wfAction] } : {})
+    }))
+    setWfAction('')
+    setWfActionNote('')
+    fetchRows()
+  } catch {
+    toast.error('Erro ao atualizar status.')
+  } finally {
+    setSavingWf(false)
   }
+}
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
   const availableActions = selected ? getAvailableActions(selected.workflow_status) : []
