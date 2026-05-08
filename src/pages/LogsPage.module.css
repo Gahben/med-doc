@@ -236,3 +236,108 @@
     text-align: right;
   }
 }
+
+/* Adicione no final: */
+.btnExport {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text2);
+  cursor: pointer;
+  transition: all 0.12s;
+  white-space: nowrap;
+}
+.btnExport:hover:not(:disabled) { background: var(--surface2); }
+.btnExport:disabled { opacity: 0.5; cursor: not-allowed; }
+.btnExport svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+.advancedFilters {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 180px;
+  padding: 9px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  background: var(--surface);
+  color: var(--text);
+  outline: none;
+}
+.searchInput:focus { border-color: var(--accent); }
+
+.dateRange {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.dateRange label { font-size: 12px; color: var(--text3); font-weight: 500; }
+
+.dateInput {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  background: var(--surface);
+  color: var(--text);
+  outline: none;
+}
+
+.btnClearFilters {
+  padding: 8px 12px;
+  border: 1px solid var(--danger);
+  border-radius: 8px;
+  background: var(--danger-light);
+  color: var(--danger);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btnClearFilters:hover { background: var(--danger); color: #fff; }
+
+.roleTag {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  margin-left: 6px;
+  background: var(--surface2);
+  color: var(--text3);
+}
+
+.prontuarioTag {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  margin-left: 6px;
+  background: var(--accent-light);
+  color: var(--accent);
+}
+
+/* Ícones que faltavam */
+.iconWorkflow { background: var(--purple-light); color: var(--purple); }
+.iconNote     { background: var(--info-light);   color: var(--info); }
+
+@media (max-width: 768px) {
+  .advancedFilters { flex-direction: column; }
+  .searchInput { min-width: 100%; }
+  .dateRange { width: 100%; }
+  .entry { flex-wrap: wrap; }
+  .time { width: 100%; text-align: right; margin-top: 4px; }
+}

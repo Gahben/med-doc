@@ -25,13 +25,13 @@ export default function Layout() {
   const [pendingCount, setPendingCount] = useState(0)
 
   useEffect(() => {
-    // Auditores veem a fila de revisão de documentos; revisores não (recebem via sistema externo)
-    if (profile?.role === 'admin' || profile?.role === 'auditor') {
-      prontuariosService.list({ status: 'pending', perPage: 1 }).then(({ count }) => {
-        if (count) setPendingCount(count)
-      })
-    }
-  }, [profile])
+  // Admin e auditor veem contagem de "em auditoria"
+  if (profile?.role === 'admin' || profile?.role === 'auditor') {
+    prontuariosService.list({ workflowStatus: 'in_audit', perPage: 1 }).then(({ count }) => {
+      if (count) setPendingCount(count)
+    })
+  }
+}, [profile])
 
   async function handleSignOut() {
     await log('login', 'Logout realizado')

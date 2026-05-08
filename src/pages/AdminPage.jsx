@@ -142,11 +142,17 @@ export default function AdminPage() {
       {/* Workflow stats */}
       <h2 className={styles.sectionTitle} style={{ marginTop: 24, marginBottom: 12 }}>Fluxo de Solicitações</h2>
       <div className={styles.statsGrid}>
-        <StatCard value={S(stats?.workflow_received)}       label="Solicitações recebidas"   color="info"    />
-        <StatCard value={S(stats?.workflow_in_production)}  label="Em produção"               color="warning" />
-        <StatCard value={S(stats?.workflow_in_audit)}       label="Em auditoria"              color="purple"  />
-        <StatCard value={S(stats?.workflow_delivered)}      label="Entregues"                 color="accent"  />
-        <StatCard value={S(stats?.pending_reviewer_notes)}  label="Notas pendentes (revisor)" color="danger"  />
+        <StatCard value={S(stats?.workflow_received)}       label="Recebidas"               color="info"    />
+        <StatCard value={S(stats?.workflow_approved)}       label="Aprovadas"               color="success" />
+        <StatCard value={S(stats?.workflow_rejected)}       label="Recusadas"               color="danger"  />
+        <StatCard value={S(stats?.workflow_in_production)}  label="Em produção"             color="warning" />
+        <StatCard value={S(stats?.workflow_not_found)}      label="Não localizados"         color="danger"  />
+        <StatCard value={S(stats?.workflow_in_audit)}       label="Em auditoria"            color="purple"  />
+        <StatCard value={S(stats?.workflow_correction_needed)} label="Correção solicitada"  color="orange"  />
+        <StatCard value={S(stats?.workflow_corrected)}      label="Corrigidos"              color="info"    />
+        <StatCard value={S(stats?.workflow_concluded)}      label="Concluídos"              color="accent"  />
+        <StatCard value={S(stats?.workflow_delivered)}      label="Entregues"               color="accent"  />
+        <StatCard value={S(stats?.pending_reviewer_notes)}  label="Notas pendentes"         color="danger"  />
       </div>
 
       {/* Users table */}
