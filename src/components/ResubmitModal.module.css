@@ -1,0 +1,206 @@
+.overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 300; padding: 16px;
+  backdrop-filter: blur(2px);
+}
+
+.modal {
+  background: var(--surface);
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: slideUp 0.2s ease;
+}
+@keyframes slideUp {
+  from { transform: translateY(16px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+.modalHeader {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
+  position: sticky; top: 0; background: var(--surface); z-index: 1;
+}
+.modalHeader h3 { font-size: 17px; font-weight: 600; margin: 0; }
+.modalSub { font-size: 12px; color: var(--text3); margin-top: 3px; display: block; }
+
+.modalClose {
+  background: none; border: none; cursor: pointer; color: var(--text3);
+  padding: 4px; border-radius: 6px; display: flex; align-items: center;
+}
+.modalClose:hover { color: var(--text); }
+.modalClose svg { width: 18px; height: 18px; }
+
+.modalBody { padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
+
+.modalFooter {
+  padding: 14px 24px 20px;
+  display: flex; gap: 8px;
+  border-top: 1px solid var(--border);
+  position: sticky; bottom: 0; background: var(--surface);
+}
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+.label { font-size: 13px; font-weight: 600; color: var(--text); }
+
+/* Radio group */
+.radioGroup { display: flex; gap: 8px; }
+.radioOption {
+  flex: 1;
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-size: 14px;
+}
+.radioOption:hover { border-color: var(--text3); }
+.radioActive {
+  border-color: var(--accent);
+  background: var(--accent-light);
+}
+.radioOption input[type="radio"] { accent-color: var(--accent); }
+
+/* Pages section */
+.pagesSection {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.pagesRow { display: flex; gap: 12px; }
+.pageField { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.pageField label { font-size: 12px; color: var(--text2); font-weight: 500; }
+.pageInput {
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  background: var(--surface);
+  color: var(--text);
+  outline: none;
+}
+.pageInput:focus { border-color: var(--accent); }
+
+.infoBox {
+  background: #e8f4fd;
+  border: 1px solid #b3d9f5;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #1a5f8a;
+}
+
+/* Dropzone */
+.dropZone {
+  border: 2px dashed var(--border);
+  border-radius: 10px;
+  padding: 28px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  background: var(--surface);
+}
+.dropZone:hover, .dropZone.drag {
+  border-color: var(--accent);
+  background: var(--accent-light);
+}
+.dropZone.hasFile {
+  border-color: var(--accent);
+  background: var(--accent-light);
+  border-style: solid;
+}
+.dropIcon { font-size: 32px; display: block; margin-bottom: 8px; }
+.dropZone p { font-size: 14px; color: var(--text2); font-weight: 500; }
+.dropHint { font-size: 12px; color: var(--text3); }
+.fileIcon { font-size: 32px; display: block; margin-bottom: 4px; }
+.fileName { font-size: 14px; color: var(--accent); font-weight: 500; word-break: break-all; }
+.fileSize { font-size: 12px; color: var(--text3); }
+
+.removeFile {
+  margin-top: 8px;
+  padding: 5px 12px;
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+  background: var(--danger-light);
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.removeFile:hover { background: var(--danger); color: #fff; }
+
+.textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 14px;
+  font-size: 14px;
+  font-family: inherit;
+  background: var(--surface);
+  color: var(--text);
+  resize: vertical;
+  outline: none;
+  min-height: 68px;
+}
+.textarea:focus { border-color: var(--accent); }
+
+/* Original info */
+.originalInfo {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.originalLabel { font-size: 12px; font-weight: 600; color: var(--text2); }
+.originalDetails {
+  font-size: 12px; color: var(--text3);
+  display: flex; gap: 6px; flex-wrap: wrap;
+}
+
+/* Buttons */
+.btnSubmit {
+  flex: 1;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 10px 20px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px; font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.12s;
+}
+.btnSubmit:hover:not(:disabled) { opacity: 0.88; }
+.btnSubmit:disabled { opacity: 0.5; cursor: not-allowed; }
+.btnSubmit svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+.btnCancel {
+  padding: 10px 20px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text2);
+  font-size: 14px; font-weight: 500;
+  cursor: pointer;
+}
+.btnCancel:hover:not(:disabled) { background: var(--surface2); }
+.btnCancel:disabled { opacity: 0.5; cursor: not-allowed; }
+
+@media (max-width: 640px) {
+  .modal { max-width: 100%; border-radius: 0; margin: 0; max-height: 100vh; }
+  .radioGroup { flex-direction: column; }
+  .pagesRow { flex-direction: column; }
+  .modalFooter { flex-direction: column; }
+  .btnCancel { width: 100%; }
+}
