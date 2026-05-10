@@ -6,6 +6,11 @@ import { ptBR } from 'date-fns/locale'
 import toast from 'react-hot-toast'
 import { PageHeader, BtnSec, BtnDanger, EmptyState, LoadingRows, Modal } from '../components/UI'
 import styles from './LixeiraPage.module.css'
+import { useAuth } from '../hooks/useAuth'
+
+const { profile } = useAuth()
+const canManage = profile?.role === 'admin'
+const canRestore = profile?.role === 'admin' || profile?.role === 'auditor'
 
 export default function LixeiraPage() {
   const log = useAuditLog()
@@ -13,6 +18,7 @@ export default function LixeiraPage() {
   const [loading, setLoading]   = useState(true)
   const [confirm, setConfirm]   = useState(null) // item to hard-delete
   const [deleting, setDeleting] = useState(false)
+  
 
   const fetch = useCallback(async () => {
     setLoading(true)
@@ -87,8 +93,12 @@ export default function LixeiraPage() {
                 </td>
                 <td>
                   <div className={styles.actions}>
-                    <BtnSec small onClick={() => restore(row)}>Restaurar</BtnSec>
-                    <BtnDanger small onClick={() => setConfirm(row)}>Excluir</BtnDanger>
+                    {canRestore && (
+                      <BtnSec small onClick={() => restore(row)}>Restaurar</BtnSec>
+                    )}
+                    {canManage && (
+                      <BtnDanger small onClick={() => setConfirm(row)}>Excluir</BtnDanger>
+                    )}
                   </div>
                 </td>
               </tr>

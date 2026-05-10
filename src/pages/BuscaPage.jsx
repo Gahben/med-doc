@@ -135,6 +135,19 @@ export default function BuscaPage() {
       log('print', `Impressão do prontuário ${selected.record_number}`, selected.id)
   }
 
+  async function handleSoftDelete() {
+  if (!selected) return
+  try {
+    await prontuariosService.softDelete(selected.id)
+    await log('delete', `Moveu prontuário ${selected.record_number} para lixeira`, selected.id)
+    toast.success('Prontuário movido para lixeira.')
+    closeDetail()
+    fetchProntuarios()
+  } catch {
+    toast.error('Erro ao mover para lixeira.')
+  }
+}
+
   function openResubmit(row) {
     setResubmitTarget(row)
     closeDetail()
@@ -346,15 +359,25 @@ export default function BuscaPage() {
         )}
         </div>
         <div className={styles.modalFooter}>
-        {canUpload && (
-          <button onClick={() => openResubmit(selected)} className={styles.btnResubmit}>
-          <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
-          </svg>
-          Enviar correção
-          </button>
-        )}
-        <button onClick={closeDetail} className={styles.btnSecondary}>Fechar</button>
+            {canUpload && (
+              <button onClick={() => openResubmit(selected)} className={styles.btnResubmit}>
+                <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+                </svg>
+                Enviar correção
+              </button>
+            )}
+            {(profile?.role === 'admin' || (canUpload && selected?.uploaded_by === user?.id)) && (
+              <button onClick={handleSoftDelete} className={styles.btnTrash}>
+                <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <polyline points="3 6 5 6 21 6"/>
+                  <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+                  <path d="M10 11v6M14 11v6"/>
+                </svg>
+                Lixeira
+              </button>
+            )}
+            <button onClick={closeDetail} className={styles.btnSecondary}>Fechar</button>
         </div>
         </div>
         </div>
