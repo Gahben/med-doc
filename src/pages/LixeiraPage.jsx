@@ -8,11 +8,10 @@ import { PageHeader, BtnSec, BtnDanger, EmptyState, LoadingRows, Modal } from '.
 import styles from './LixeiraPage.module.css'
 import { useAuth } from '../hooks/useAuth'
 
-const { profile } = useAuth()
-const canManage = profile?.role === 'admin'
-const canRestore = profile?.role === 'admin' || profile?.role === 'auditor'
-
 export default function LixeiraPage() {
+  const { profile } = useAuth()
+  const canManage = profile?.role === 'admin'
+  const canRestore = profile?.role === 'admin' || profile?.role === 'auditor'
   const log = useAuditLog()
   const [rows, setRows]         = useState([])
   const [loading, setLoading]   = useState(true)
