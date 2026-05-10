@@ -6,7 +6,6 @@ import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import toast from 'react-hot-toast'
 import { PageHeader, EmptyState, LoadingRows } from '../components/UI'
-import ResubmitModal from '../components/ResubmitModal'
 import styles from './BuscaPage.module.css'
 
 const PAGE_SIZE = 20
@@ -384,16 +383,6 @@ export default function BuscaPage() {
     )}
 
     {/* Modal de reenvio corrigido (NOVO componente) */}
-    {resubmitTarget && (
-      <ResubmitModal
-      prontuario={resubmitTarget}
-      onClose={() => setResubmitTarget(null)}
-      onSuccess={() => {
-        setResubmitTarget(null)
-        fetchProntuarios()
-      }}
-      />
-    )}
     </div>
   )
 }
