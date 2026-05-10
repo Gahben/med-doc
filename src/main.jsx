@@ -6,6 +6,10 @@ import App from './App'
 import { AuthProvider } from './hooks/useAuth'
 import './styles/global.css'
 
+// Debug: verificar se há duas cópias do React
+console.log('React version:', React.version)
+console.log('Is AuthProvider a function?', typeof AuthProvider)
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
