@@ -38,7 +38,6 @@ export default function App() {
       <Route path="/" element={<RequireAuth><Layout /></RequireAuth>}>
         <Route index element={<Navigate to="/busca" replace />} />
         <Route path="busca" element={<BuscaPage />} />
-        // Em App.jsx, atualizar as roles das rotas:
         <Route path="upload" element={
           <RequireAuth roles={['admin', 'operador']}><UploadPage /></RequireAuth>
         } />
@@ -61,7 +60,6 @@ export default function App() {
           <RequireAuth roles={['admin', 'operador']}><ProducaoPage /></RequireAuth>
         } />
       </Route>
-      
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
