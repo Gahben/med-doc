@@ -133,3 +133,95 @@
   max-width: 1000px;
   overflow-x: hidden;
 }
+
+/* ─── SININHO DE NOTIFICAÇÕES ───────────────── */
+.bellWrap { position: relative; }
+
+.bellBtn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: none;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--text2);
+  transition: background 0.15s;
+}
+.bellBtn:hover { background: var(--surface2); }
+.bellBtn svg { width: 16px; height: 16px; }
+
+.bellBadge {
+  position: absolute;
+  top: 2px; right: 2px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 99px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  line-height: 1;
+}
+
+.bellPanel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 320px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  z-index: 200;
+  overflow: hidden;
+  animation: fadeIn 0.15s ease;
+}
+
+.bellPanelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text2);
+}
+.markAll {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--accent);
+  padding: 0;
+}
+.markAll:hover { text-decoration: underline; }
+
+.bellEmpty { padding: 20px; text-align: center; font-size: 13px; color: var(--text3); }
+
+.bellList { list-style: none; max-height: 340px; overflow-y: auto; }
+
+.bellItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.bellItem:last-child { border-bottom: none; }
+.bellItem:hover { background: var(--surface2); }
+.bellUnread { background: var(--accent-light); }
+.bellUnread:hover { background: #d4eadc; }
+
+.bellMsg  { font-size: 12px; color: var(--text); line-height: 1.4; }
+.bellTime { font-size: 11px; color: var(--text3); }

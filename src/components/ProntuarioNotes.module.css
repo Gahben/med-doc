@@ -1,0 +1,168 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-top: 1px solid var(--border);
+  margin-top: 20px;
+  padding-top: 16px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.title { font-size: 13px; font-weight: 600; color: var(--text2); }
+.count {
+  font-size: 11px;
+  background: var(--surface2);
+  color: var(--text2);
+  padding: 1px 7px;
+  border-radius: 99px;
+}
+
+/* ─── FEED ─────────────────────────────────── */
+.feed {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 340px;
+  overflow-y: auto;
+  padding-right: 4px;
+  margin-bottom: 12px;
+}
+
+.empty { font-size: 13px; color: var(--text3); text-align: center; padding: 20px 0; }
+
+/* ─── NOTE BUBBLE ──────────────────────────── */
+.note {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  transition: border-color 0.15s;
+}
+.note.own {
+  background: var(--accent-light);
+  border-color: #b6d9c6;
+}
+
+.noteMeta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 5px;
+  flex-wrap: wrap;
+}
+
+.noteAuthor { font-size: 12px; font-weight: 600; color: var(--text); }
+.noteTime   { font-size: 11px; color: var(--text3); margin-left: auto; }
+
+.noteRole {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 99px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.role_admin    { background: #fee2e2; color: #991b1b; }
+.role_auditor  { background: var(--purple-light); color: var(--purple); }
+.role_revisor  { background: var(--info-light); color: var(--info); }
+.role_operador { background: var(--warning-light); color: var(--warning); }
+
+.noteBody {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+:global(.mention) {
+  background: var(--accent-light);
+  color: var(--accent);
+  border-radius: 4px;
+  padding: 0 3px;
+  font-weight: 600;
+}
+
+.deleteBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text3);
+  font-size: 15px;
+  line-height: 1;
+  padding: 0 2px;
+  margin-left: 4px;
+  border-radius: 4px;
+}
+.deleteBtn:hover { color: var(--danger); background: var(--danger-light); }
+
+/* ─── COMPOSE ──────────────────────────────── */
+.compose { position: relative; }
+
+.mentionList {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  list-style: none;
+  z-index: 50;
+  overflow: hidden;
+}
+.mentionList li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.1s;
+}
+.mentionList li:hover { background: var(--accent-light); }
+.mentionRole { font-size: 11px; color: var(--text3); }
+
+.textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+  transition: border-color 0.15s;
+}
+.textarea:focus { outline: none; border-color: var(--accent); }
+.textarea:disabled { opacity: 0.6; }
+
+.composeFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+}
+.hint { font-size: 11px; color: var(--text3); }
+
+.sendBtn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.sendBtn:hover:not(:disabled) { background: var(--accent-hover); }
+.sendBtn:disabled { opacity: 0.5; cursor: not-allowed; }

@@ -683,3 +683,131 @@ export const emailService = {
     }),
   },
 }
+// ==================== NOTAS DE PRONTUÁRIO ====================
+// Histórico compartilhado de notas sobre um prontuário.
+// Todos os roles com acesso ao sistema podem ver e adicionar.
+
+export const prontuarioNotesService = {
+  /** Lista notas de um prontuário, mais antigas primeiro (ordem de conversa). */
+  list: (prontuarioId) =>
+    supabase
+      .from('prontuario_notes')
+      .select('*, profiles!author_id(id, name, role)')
+      .eq('prontuario_id', prontuarioId)
+      .order('created_at', { ascending: true }),
+
+  /** Cria uma nota. Mentions é array de UUIDs dos usuários marcados com @. */
+  create: (prontuarioId, authorId, body, mentions = []) =>
+    supabase.from('prontuario_notes').insert({
+      prontuario_id: prontuarioId,
+      author_id: authorId,
+      body,
+      mentions,
+    }).select('*, profiles!author_id(id, name, role)').single(),
+
+  /** Remove nota (somente o próprio autor, reforçado por RLS). */
+  remove: (id) =>
+    supabase.from('prontuario_notes').delete().eq('id', id),
+}
+
+// ==================== NOTIFICAÇÕES ====================
+// Criadas pelo app nas mudanças de workflow e em @menções.
+// Polling no hook useNotifications (sem Realtime).
+
+export const notificationsService = {
+  /** Lista notificações do usuário, não lidas primeiro. */
+  list: (userId, limit = 30) =>
+    supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .order('read', { ascending: true })
+      .order('created_at', { ascending: false })
+      .limit(limit),
+
+  /** Contagem de não lidas (para o badge). */
+  unreadCount: async (userId) => {
+    const { count } = await supabase
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('read', false)
+    return count ?? 0
+  },
+
+  /** Marca uma notificação como lida. */
+  markRead: (id) =>
+    supabase.from('notifications').update({ read: true }).eq('id', id),
+
+  /** Marca todas as notificações do usuário como lidas. */
+  markAllRead: (userId) =>
+    supabase.from('notifications').update({ read: true })
+      .eq('user_id', userId).eq('read', false),
+
+  /**
+   * Cria notificações para um conjunto de usuários.
+   * @param {string[]} userIds
+   * @param {object}   payload  { prontuario_id, type, message }
+   */
+  createForUsers: (userIds, payload) => {
+    if (!userIds?.length) return Promise.resolve()
+    const rows = userIds.map(user_id => ({ user_id, ...payload }))
+    return supabase.from('notifications').insert(rows)
+  },
+}
+
+// ==================== HELPERS DE NOTIFICAÇÃO POR WORKFLOW ====================
+//
+// Chame notifyWorkflowChange() sempre que atualizar o workflow_status.
+// Ele busca os usuários corretos e cria as notificações automaticamente.
+
+/**
+ * Retorna os IDs dos usuários de um ou mais roles.
+ * @param {string[]} roles
+ */
+async function getUserIdsByRoles(roles) {
+  const { data } = await supabase
+    .from('profiles')
+    .select('id')
+    .in('role', roles)
+    .eq('active', true)
+  return (data ?? []).map(p => p.id)
+}
+
+/**
+ * Dispara notificações para os roles corretos conforme a transição de workflow.
+ *
+ * @param {string} newStatus   - Novo workflow_status
+ * @param {object} prontuario  - { id, record_number, patient_name }
+ * @param {string} actorId     - ID de quem fez a mudança (para não notificar a si mesmo)
+ */
+export async function notifyWorkflowChange(newStatus, prontuario, actorId) {
+  const label = STATUS_WORKFLOW[newStatus]?.label ?? newStatus
+  const ref   = `${prontuario.record_number} – ${prontuario.patient_name}`
+
+  // Mapa: status → roles que recebem notificação
+  const targetRoles = {
+    received:          ['revisor', 'admin'],
+    request_approved:  ['operador', 'admin'],
+    request_rejected:  ['operador'],
+    in_production:     [],                          // mudança interna do operador
+    not_found:         ['revisor', 'admin'],
+    in_audit:          ['auditor', 'admin'],
+    correction_needed: ['operador'],
+    corrected:         ['auditor'],
+    concluded:         ['admin'],
+    delivered:         ['admin'],
+  }
+
+  const roles = targetRoles[newStatus]
+  if (!roles?.length) return
+
+  const userIds = (await getUserIdsByRoles(roles)).filter(id => id !== actorId)
+  if (!userIds.length) return
+
+  await notificationsService.createForUsers(userIds, {
+    prontuario_id: prontuario.id,
+    type: 'workflow_change',
+    message: `${label}: ${ref}`,
+  })
+}
