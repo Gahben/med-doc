@@ -10,7 +10,7 @@ import LogsPage from './pages/LogsPage'
 import AdminPage from './pages/AdminPage'
 import LixeiraPage from './pages/LixeiraPage'
 import RevisorPage from './pages/RevisorPage'
-//import ProducaoPage from './pages/ProducaoPage'
+import ProducaoPage from './pages/ProducaoPage'  // ← DESCOMENTADO
 
 function RequireAuth({ children, roles }) {
   const { user, profile, loading } = useAuth()
@@ -41,6 +41,9 @@ export default function App() {
         <Route path="upload" element={
           <RequireAuth roles={['admin', 'operador']}><UploadPage /></RequireAuth>
         } />
+        <Route path="producao" element={   // ← ADICIONADO
+          <RequireAuth roles={['admin', 'operador']}><ProducaoPage /></RequireAuth>
+        } />
         <Route path="revisao" element={
           <RequireAuth roles={['admin', 'auditor']}><RevisaoPage /></RequireAuth>
         } />
@@ -56,7 +59,6 @@ export default function App() {
         <Route path="admin" element={
           <RequireAuth roles={['admin']}><AdminPage /></RequireAuth>
         } />
-        
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
