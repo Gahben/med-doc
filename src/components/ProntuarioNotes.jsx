@@ -20,9 +20,13 @@ export default function ProntuarioNotes({ prontuarioId, prontuario }) {
   const [sending,  setSending]  = useState(false)
   const [allUsers, setAllUsers] = useState([])   // para @mention autocomplete
   const [mention,  setMention]  = useState(null) // { query, start } ou null
-  const bottomRef  = useRef(null)
+  
+  // ESTADO ADICIONADO: Controla quais IDs de notas de IA estão expandidos
+  const [expandedNotes, setExpandedNotes] = useState({})
+
+  const bottomRef   = useRef(null)
   const textareaRef = useRef(null)
-  const timerRef   = useRef(null)
+  const timerRef    = useRef(null)
 
   // Carrega lista de usuários uma vez (para @mention)
   useEffect(() => {
@@ -47,6 +51,14 @@ export default function ProntuarioNotes({ prontuarioId, prontuario }) {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [notes.length])
+
+  // Alterna a expansão de uma nota da IA
+  const toggleExpand = (noteId) => {
+    setExpandedNotes(prev => ({
+      ...prev,
+      [noteId]: !prev[noteId]
+    }))
+  }
 
   // Detecta @mention enquanto digita
   function handleTextChange(e) {
@@ -86,7 +98,6 @@ export default function ProntuarioNotes({ prontuarioId, prontuario }) {
     if (!text || sending) return
     setSending(true)
 
-    // Extrai UUIDs mencionados
     const mentionedIds = allUsers
       .filter(u => text.includes(`@${u.name}`))
       .map(u => u.id)
@@ -99,7 +110,6 @@ export default function ProntuarioNotes({ prontuarioId, prontuario }) {
       setNotes(prev => [...prev, note])
       setBody('')
 
-      // Notifica mencionados
       if (mentionedIds.length && prontuario) {
         const ref = `${prontuario.record_number} – ${prontuario.patient_name}`
         await notificationsService.createForUsers(
@@ -116,9 +126,7 @@ export default function ProntuarioNotes({ prontuarioId, prontuario }) {
   }
 
   function handleKeyDown(e) {
-    // Envia com Ctrl+Enter ou Cmd+Enter
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') handleSubmit(e)
-    // Esc fecha mention
     if (e.key === 'Escape') setMention(null)
   }
 
@@ -141,8 +149,51 @@ export default function ProntuarioNotes({ prontuarioId, prontuario }) {
         {!loading && notes.length === 0 && (
           <p className={styles.empty}>Nenhuma nota ainda. Seja o primeiro.</p>
         )}
-        {notes.map(n => {
+        {!loading && notes.map(n => {
           const isOwn = n.author_id === user?.id
+          
+          // Identifica se a nota veio do Robô/IA (n8n) baseado no conteúdo ou papel do autor
+          const isAI = n.body?.includes('[Análise de Compliance') || n.profiles?.role === 'auditor'
+          const isExpanded = expandedNotes[n.id]
+
+          // Se for nota de IA, renderiza com comportamento EXPANSÍVEL
+          if (isAI) {
+            return (
+              <div 
+                key={n.id} 
+                className={`${styles.note}`}
+                style={{ 
+                  borderLeft: '4px solid #10b981', 
+                  backgroundColor: '#f9fafb', 
+                  cursor: 'pointer',
+                  padding: '12px',
+                  marginBottom: '10px',
+                  borderRadius: '0 8px 8px 0'
+                }}
+                onClick={() => toggleExpand(n.id)}
+              >
+                <div className={styles.noteMeta} style={{ marginBottom: isExpanded ? '8px' : '0' }}>
+                  <span className={styles.noteAuthor} style={{ color: '#065f46', fontWeight: 'bold' }}>
+                    🤖 {n.profiles?.name || 'MED-DOC IA'}
+                  </span>
+                  <span className={styles.noteTime}>
+                    {format(new Date(n.created_at), "dd/MM/yy HH:mm", { locale: ptBR })}
+                  </span>
+                  <span style={{ fontSize: '11px', color: '#10b981', marginLeft: 'auto', fontWeight: '500' }}>
+                    {isExpanded ? 'Clique para fechar ▲' : 'Clique para expandir parecer ▼'}
+                  </span>
+                </div>
+                
+                {isExpanded && (
+                  <div className={styles.noteBody} style={{ color: '#374151', borderTop: '1px solid #e5e7eb', paddingTop: '8px', whiteSpace: 'pre-line' }}>
+                    {renderBody(n.body, allUsers)}
+                  </div>
+                )}
+              </div>
+            )
+          }
+
+          // Se for uma nota humana comum, mantém o layout original idêntico
           return (
             <div key={n.id} className={`${styles.note} ${isOwn ? styles.own : ''}`}>
               <div className={styles.noteMeta}>
@@ -209,6 +260,7 @@ export default function ProntuarioNotes({ prontuarioId, prontuario }) {
 
 /** Renderiza o body destacando @menções */
 function renderBody(text, users) {
+  if (!text) return null
   const parts = text.split(/(@\S+)/g)
   return parts.map((part, i) => {
     if (part.startsWith('@')) {
