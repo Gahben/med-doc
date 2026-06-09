@@ -8,6 +8,7 @@ import { ptBR } from 'date-fns/locale'
 import toast from 'react-hot-toast'
 import { PageHeader, EmptyState } from '../components/UI'
 import styles from './RevisaoPage.module.css'
+import ProntuarioNotes from '../components/ProntuarioNotes';
 
 const PAGE_SIZE = 20
 
@@ -440,6 +441,12 @@ export default function RevisaoPage() {
                           </svg>
                           Imprimir
                         </button>
+                      <div style={{ marginTop: '20px', borderTop: '1px solid #e2e8f0', paddingTop: '20px' }}>
+                          <ProntuarioNotes 
+                            prontuarioId={current?.id} 
+                            prontuario={current} />
+                         
+                        </div>
                       </div>
 
                       {/* Visualização inline do PDF */}
