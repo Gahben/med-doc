@@ -441,12 +441,7 @@ export default function RevisaoPage() {
                           </svg>
                           Imprimir
                         </button>
-                      <div style={{ marginTop: '20px', borderTop: '1px solid #e2e8f0', paddingTop: '20px' }}>
-                          <ProntuarioNotes 
-                            prontuarioId={current?.id} 
-                            prontuario={current} />
-                         
-                        </div>
+
                       </div>
 
                       {/* Visualização inline do PDF */}
