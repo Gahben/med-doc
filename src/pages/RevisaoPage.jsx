@@ -1,6 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/storage'
-import { STATUS_WORKFLOW, ALLOWED_TRANSITIONS_BY_ROLE } from '../lib/storage'
+import {
+  STATUS_WORKFLOW,
+  getAllowedTransitions,
+  applyWorkflowTransition,
+  notifyWorkflowChange,
+} from '../lib/storage'
 import { useAuth } from '../hooks/useAuth'
 import { useAuditLog } from '../hooks/useAuditLog'
 import { format } from 'date-fns'
@@ -29,15 +34,8 @@ const WORKFLOW_FILTER_OPTIONS = [
   { value: 'in_audit',          label: '🔎 Em auditoria' },
   { value: 'correction_needed', label: '✏️ Correção solicitada' },
   { value: 'corrected',         label: '🔄 Corrigido' },
-  { value: 'concluded',         label: '🏁 Concluído' },
-]
-
-// Ações do auditor sobre o workflow (não o status do documento)
-// O auditor move o prontuário no fluxo: in_audit → correction_needed | concluded
-const AUDITOR_WF_ACTIONS = [
-  { value: 'correction_needed', label: '✏️ Solicitar correção' },
-  { value: 'corrected',         label: '🔄 Marcar como corrigido' },
-  { value: 'concluded',         label: '🏁 Concluir (auditoria OK)' },
+  { value: 'concluded',          label: '🏁 Aprovado para entrega' },
+  { value: 'ready_for_delivery', label: '📋 Pronto para entrega' },
 ]
 
 function WfBadge({ status }) {
@@ -77,11 +75,13 @@ export default function RevisaoPage() {
   const [sortField, sortDir] = sort.split(':')
 
   const userRole = profile?.role ?? 'auditor'
-  const allowedWfTransitions = ALLOWED_TRANSITIONS_BY_ROLE[userRole] ?? {}
 
   const getAvailableWfActions = (currentWfStatus) => {
-    const allowed = allowedWfTransitions[currentWfStatus] ?? []
-    return AUDITOR_WF_ACTIONS.filter(a => allowed.includes(a.value))
+    const allowed = getAllowedTransitions(userRole, currentWfStatus)
+    return allowed.map(key => {
+      const cfg = STATUS_WORKFLOW[key]
+      return { value: key, label: `${cfg?.icon ?? ''} ${cfg?.label ?? key}` }
+    })
   }
 
   const fetchFila = useCallback(async () => {
@@ -99,7 +99,7 @@ export default function RevisaoPage() {
         q = q.eq('workflow_status', workflowFilter)
       } else {
         // Quando "Todos", mostra os relevantes para auditoria
-        q = q.in('workflow_status', ['in_audit', 'correction_needed', 'corrected', 'concluded'])
+        q = q.in('workflow_status', ['in_audit', 'correction_needed', 'corrected', 'concluded', 'ready_for_delivery'])
         q = q.neq('status', 'trash')
       }
 
@@ -162,38 +162,38 @@ export default function RevisaoPage() {
   if (!wfAction || !current) return
   setSavingWf(true)
   try {
-    // Mapeia workflow → document status
     const docStatusMap = {
-      'concluded': 'approved',
-      'correction_needed': 'reproved',
+      concluded: 'approved',
+      correction_needed: 'reproved',
     }
 
-    const updatePayload = {
-      workflow_status: wfAction,
-      ...(wfNote.trim() ? { workflow_note: wfNote.trim() } : {}),
-      updated_at: new Date().toISOString(),
-    }
+    await applyWorkflowTransition({
+      prontuarioId: current.id,
+      workflowStatus: wfAction,
+      note: wfNote.trim() || null,
+      userId: user?.id,
+    })
 
     if (docStatusMap[wfAction]) {
-      updatePayload.status = docStatusMap[wfAction]
-      updatePayload.reviewed_at = new Date().toISOString()
-      updatePayload.reviewed_by = user.id
+      await supabase
+        .from('prontuarios')
+        .update({
+          status: docStatusMap[wfAction],
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: user.id,
+        })
+        .eq('id', current.id)
     }
-
-    const { error: err } = await supabase
-      .from('prontuarios')
-      .update(updatePayload)
-      .eq('id', current.id)
-    if (err) throw err
 
     const cfg = STATUS_WORKFLOW[wfAction]
     await log('workflow_update', `Workflow → "${cfg?.label}" · ${current.record_number}`, current.id)
+    await notifyWorkflowChange(wfAction, current, user?.id)
 
     toast.success(`Fluxo: "${cfg?.label}".`)
-    setCurrent(prev => ({ 
-      ...prev, 
+    setCurrent(prev => ({
+      ...prev,
       workflow_status: wfAction,
-      ...(docStatusMap[wfAction] ? { status: docStatusMap[wfAction] } : {})
+      ...(docStatusMap[wfAction] ? { status: docStatusMap[wfAction] } : {}),
     }))
     setWfAction('')
     setWfNote('')

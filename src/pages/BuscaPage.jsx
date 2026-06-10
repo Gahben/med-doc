@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase, prontuariosService, STATUS_WORKFLOW } from '../lib/storage'
+import ResubmitModal from '../components/ResubmitModal'
 import { useAuth } from '../hooks/useAuth'
 import { useAuditLog } from '../hooks/useAuditLog'
 import { format } from 'date-fns'
@@ -36,6 +37,7 @@ export default function BuscaPage() {
 
   // Modal de detalhe
   const [selected,        setSelected]        = useState(null)
+  const [linkedRequest,   setLinkedRequest]   = useState(null)
   const [fileUrl,         setFileUrl]         = useState('')
   const [showInlinePdf,   setShowInlinePdf]   = useState(false)
   const [isPdf,           setIsPdf]           = useState(false)
@@ -56,7 +58,7 @@ export default function BuscaPage() {
     try {
       let q = supabase
       .from('prontuarios')
-      .select('*, profiles!prontuarios_uploaded_by_fkey(name, role)', { count: 'exact' })
+      .select('*, profiles!prontuarios_uploaded_by_fkey(name, role), patient_requests!patient_request_id(id, token, workflow_status, requester_name, contact_phone, record_number)', { count: 'exact' })
       .neq('status', 'trash')
       .order('created_at', { ascending: false })
       .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1)
@@ -95,9 +97,20 @@ export default function BuscaPage() {
 
   async function openDetail(row) {
     setSelected(row)
+    setLinkedRequest(row.patient_requests ?? null)
     setFileUrl('')
     setShowInlinePdf(false)
     setIsPdf(false)
+
+    if (!row.patient_requests && row.patient_request_id) {
+      const { data } = await supabase
+        .from('patient_requests')
+        .select('id, token, workflow_status, requester_name, contact_phone, record_number')
+        .eq('id', row.patient_request_id)
+        .maybeSingle()
+      setLinkedRequest(data)
+    }
+
     if (row.file_path) {
       const { data } = await supabase.storage
       .from('prontuarios')
@@ -112,6 +125,7 @@ export default function BuscaPage() {
 
   function closeDetail() {
     setSelected(null)
+    setLinkedRequest(null)
     setFileUrl('')
     setShowInlinePdf(false)
   }
@@ -308,6 +322,18 @@ export default function BuscaPage() {
         )}
         </dl>
 
+        {linkedRequest && (
+          <div className={styles.fileSection}>
+            <h4 className={styles.sectionTitle}>Solicitação do Paciente Vinculada</h4>
+            <dl className={styles.detailGrid}>
+              <div><dt>Token</dt><dd className={styles.mono}>{linkedRequest.token}</dd></div>
+              <div><dt>Solicitante</dt><dd>{linkedRequest.requester_name}</dd></div>
+              <div><dt>Telefone</dt><dd>{linkedRequest.contact_phone || '—'}</dd></div>
+              <div><dt>Status da solicitação</dt><dd><WfBadge status={linkedRequest.workflow_status} /></dd></div>
+            </dl>
+          </div>
+        )}
+
         {/* Arquivo: ações + inline PDF */}
         {selected.file_path && (
           <div className={styles.fileSection}>
@@ -382,7 +408,13 @@ export default function BuscaPage() {
         </div>
     )}
 
-    {/* Modal de reenvio corrigido (NOVO componente) */}
+    {resubmitTarget && (
+      <ResubmitModal
+        prontuario={resubmitTarget}
+        onClose={() => setResubmitTarget(null)}
+        onSuccess={fetchProntuarios}
+      />
+    )}
     </div>
   )
 }

@@ -1,20 +1,39 @@
 import { useState, useEffect } from 'react'
-import { patientRequestsService, cpfHelpers, storageService } from '../lib/storage'
+import {
+  patientRequestsService,
+  cpfHelpers,
+  storageService,
+  STATUS_WORKFLOW,
+  getAllowedTransitions,
+  notifyWorkflowChange,
+} from '../lib/storage'
 import toast from 'react-hot-toast'
 import { useAuth } from '../hooks/useAuth'
 import styles from './RevisorPage.module.css'
 import { PageHeader, EmptyState } from '../components/UI'
 
-const STATUS_LABELS = {
-  pending: 'Pendente',
-  approved: 'Aprovada',
-  rejected: 'Recusada',
-  completed: 'Concluída',
+const WF_FILTER_OPTIONS = [
+  { value: 'all', label: 'Todos os Status' },
+  ...Object.entries(STATUS_WORKFLOW).map(([value, cfg]) => ({
+    value,
+    label: `${cfg.icon} ${cfg.label}`,
+  })),
+]
+
+function WfBadge({ status }) {
+  if (!status) return <span className={styles.badgeNone}>—</span>
+  const cfg = STATUS_WORKFLOW[status] || { label: status, color: 'info', icon: '' }
+  return (
+    <span className={`${styles.wfBadge} ${styles['wf_' + cfg.color]}`}>
+      {cfg.icon} {cfg.label}
+    </span>
+  )
 }
 
-function statusBadgeClass(status, styles) {
-  const key = status === 'rejected' ? 'reproved' : status
-  return styles[`doc_${key}`] ?? styles.doc_pending
+function whatsAppUrl(phone, message) {
+  const digits = (phone || '').replace(/\D/g, '')
+  const withCountry = digits.startsWith('55') ? digits : `55${digits}`
+  return `https://wa.me/${withCountry}?text=${encodeURIComponent(message)}`
 }
 
 export default function RevisorPage() {
@@ -35,10 +54,10 @@ export default function RevisorPage() {
     setLoading(true)
     try {
       const { data, error } = await patientRequestsService.list({
-        status: statusFilter === 'all' ? null : statusFilter,
+        workflowStatus: statusFilter === 'all' ? null : statusFilter,
         search: searchTerm,
       })
-      
+
       if (error) throw error
       setRequests(data || [])
     } catch (error) {
@@ -51,20 +70,50 @@ export default function RevisorPage() {
 
   const handleUpdateStatus = async (newStatus) => {
     if (!selectedRequest) return
-    
+
     setIsUpdating(true)
     try {
-      // Passa o ID do usuário logado (user?.id) para identificar quem recebeu/atualizou
-      const { error } = await patientRequestsService.updateStatus(
+      let finalStatus = newStatus
+
+      if (newStatus === 'request_approved') {
+        const { error: approveErr } = await patientRequestsService.updateWorkflowStatus(
+          selectedRequest.id,
+          'request_approved',
+          notes || null,
+          user?.id || null
+        )
+        if (approveErr) throw approveErr
+        finalStatus = 'in_production'
+      }
+
+      const { error } = await patientRequestsService.updateWorkflowStatus(
         selectedRequest.id,
-        newStatus,
+        finalStatus,
         notes || null,
         user?.id || null
       )
-      
+
       if (error) throw error
-      
-      toast.success('Status atualizado com sucesso!')
+
+      const cfg = STATUS_WORKFLOW[finalStatus]
+      if (selectedRequest.prontuario_id) {
+        await notifyWorkflowChange(finalStatus, {
+          id: selectedRequest.prontuario_id,
+          record_number: selectedRequest.record_number || selectedRequest.token,
+          patient_name: selectedRequest.requester_name,
+        }, user?.id)
+      } else if (finalStatus === 'in_production') {
+        await notifyWorkflowChange('request_approved', {
+          id: selectedRequest.id,
+          record_number: selectedRequest.record_number || selectedRequest.token,
+          patient_name: selectedRequest.requester_name,
+        }, user?.id)
+      }
+
+      const msg = newStatus === 'request_approved'
+        ? 'Solicitação aprovada e encaminhada para produção'
+        : `Status atualizado: ${cfg?.label}`
+      toast.success(msg)
       setSelectedRequest(null)
       setNotes('')
       loadRequests()
@@ -97,11 +146,15 @@ export default function RevisorPage() {
     toast.success('Link copiado para a área de transferência')
   }
 
+  const availableActions = selectedRequest
+    ? getAllowedTransitions('revisor', selectedRequest.workflow_status)
+    : []
+
   return (
     <div>
       <PageHeader
         title="Painel do Revisor"
-        subtitle="Gerencie e aprove as solicitações de prontuários feitas pelos pacientes"
+        subtitle="Analise solicitações, aprove ou recuse e encaminhe para produção"
         actions={
           <button onClick={loadRequests} disabled={loading} className={styles.btnRefresh}>
             <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -118,15 +171,15 @@ export default function RevisorPage() {
           <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
         </svg>
         <span>
-          O Revisor analisa as solicitações de prontuários criadas pelos pacientes. 
-          Verifique os dados informados, visualize o PDF assinado e depois aprove, recuse ou conclua a solicitação.
+          Novas solicitações chegam como <strong>Recebida</strong>. Ao aprovar, a solicitação vai automaticamente para <strong>Em Produção</strong>.
+          Em caso de divergências, entre em contato pelo WhatsApp antes de aprovar.
         </span>
       </div>
 
       <div className={styles.filters}>
         <input
           type="text"
-          placeholder="Buscar por nome, CPF ou token..."
+          placeholder="Buscar por nome, CPF, token ou nº prontuário..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className={styles.searchInput}
@@ -136,11 +189,9 @@ export default function RevisorPage() {
           onChange={(e) => setStatusFilter(e.target.value)}
           className={styles.select}
         >
-          <option value="all">Todos os Status</option>
-          <option value="pending">Pendente</option>
-          <option value="approved">Aprovada</option>
-          <option value="rejected">Recusada</option>
-          <option value="completed">Concluída</option>
+          {WF_FILTER_OPTIONS.map(opt => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
         </select>
       </div>
 
@@ -172,6 +223,7 @@ export default function RevisorPage() {
                     <th>Token</th>
                     <th>Solicitante</th>
                     <th>CPF</th>
+                    <th>Prontuário</th>
                     <th>Data</th>
                     <th>Status</th>
                     <th>Ações</th>
@@ -194,13 +246,14 @@ export default function RevisorPage() {
                       <td className={styles.tdMono}>
                         {cpfHelpers.format(request.requester_cpf)}
                       </td>
+                      <td className={styles.tdMono}>
+                        {request.record_number || '—'}
+                      </td>
                       <td className={styles.tdDate}>
                         {new Date(request.created_at).toLocaleDateString('pt-BR')}
                       </td>
                       <td>
-                        <span className={`${styles.docBadge} ${statusBadgeClass(request.status, styles)}`}>
-                          {STATUS_LABELS[request.status]}
-                        </span>
+                        <WfBadge status={request.workflow_status} />
                       </td>
                       <td>
                         <div className={styles.actionBtns}>
@@ -246,6 +299,7 @@ export default function RevisorPage() {
                 <h3>Gerenciar Solicitação {selectedRequest.token}</h3>
                 <span className={styles.modalSub}>
                   Criada em {new Date(selectedRequest.created_at).toLocaleDateString('pt-BR')}
+                  {selectedRequest.record_number && ` · Prontuário ${selectedRequest.record_number}`}
                 </span>
               </div>
               <button onClick={() => setSelectedRequest(null)} className={styles.modalClose}>
@@ -274,14 +328,30 @@ export default function RevisorPage() {
                   </div>
                   <div>
                     <dt>Status da Solicitação</dt>
-                    <dd>
-                      <span className={`${styles.docBadge} ${statusBadgeClass(selectedRequest.status, styles)}`}>
-                        {STATUS_LABELS[selectedRequest.status]}
-                      </span>
-                    </dd>
+                    <dd><WfBadge status={selectedRequest.workflow_status} /></dd>
                   </div>
                 </dl>
               </div>
+
+              {selectedRequest.contact_phone && (
+                <div className={styles.section}>
+                  <h4 className={styles.sectionTitle}>Contato via WhatsApp</h4>
+                  <p className={styles.sectionHint}>
+                    Use o WhatsApp para solicitar correções quando houver divergências nos dados ou no PDF assinado.
+                  </p>
+                  <a
+                    href={whatsAppUrl(
+                      selectedRequest.contact_phone,
+                      `Olá ${selectedRequest.requester_name}, somos do setor de prontuários. Precisamos de ajustes na sua solicitação ${selectedRequest.token}.`
+                    )}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`${styles.btnFileAction} ${styles.btnFileActionFull}`}
+                  >
+                    Abrir conversa no WhatsApp
+                  </a>
+                </div>
+              )}
 
               {selectedRequest.is_third_party && (
                 <div className={styles.section}>
@@ -342,7 +412,7 @@ export default function RevisorPage() {
               )}
 
               <div className={styles.section}>
-                <h4 className={styles.sectionTitle}>Observações (Salvo ao mudar status)</h4>
+                <h4 className={styles.sectionTitle}>Observações (salvas ao mudar status)</h4>
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
@@ -352,39 +422,31 @@ export default function RevisorPage() {
                 />
               </div>
 
-              <div className={styles.section}>
-                <h4 className={styles.sectionTitle}>Atualizar Status</h4>
-                <div className={`${styles.fileActions} ${styles.statusActions}`}>
-                  <button
-                    onClick={() => handleUpdateStatus('approved')}
-                    disabled={isUpdating}
-                    className={`${styles.btnFileAction} ${styles.btnStatusApprove}`}
-                  >
-                    Aprovar
-                  </button>
-                  <button
-                    onClick={() => handleUpdateStatus('rejected')}
-                    disabled={isUpdating}
-                    className={`${styles.btnFileAction} ${styles.btnStatusReject}`}
-                  >
-                    Recusar
-                  </button>
-                  <button
-                    onClick={() => handleUpdateStatus('completed')}
-                    disabled={isUpdating}
-                    className={`${styles.btnFileAction} ${styles.btnStatusComplete}`}
-                  >
-                    Concluir
-                  </button>
-                  <button
-                    onClick={() => handleUpdateStatus('pending')}
-                    disabled={isUpdating}
-                    className={`${styles.btnFileAction} ${styles.btnStatusPending}`}
-                  >
-                    Pendente
-                  </button>
+              {availableActions.length > 0 && (
+                <div className={styles.section}>
+                  <h4 className={styles.sectionTitle}>Atualizar Status</h4>
+                  <div className={`${styles.fileActions} ${styles.statusActions}`}>
+                    {availableActions.map(action => {
+                      const cfg = STATUS_WORKFLOW[action]
+                      const btnClass = action === 'request_rejected' || action === 'cancelled'
+                        ? styles.btnStatusReject
+                        : action === 'request_approved' || action === 'in_production'
+                          ? styles.btnStatusApprove
+                          : styles.btnStatusComplete
+                      return (
+                        <button
+                          key={action}
+                          onClick={() => handleUpdateStatus(action)}
+                          disabled={isUpdating}
+                          className={`${styles.btnFileAction} ${btnClass}`}
+                        >
+                          {cfg?.icon} {cfg?.label}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>

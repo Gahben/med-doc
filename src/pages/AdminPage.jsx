@@ -150,9 +150,12 @@ export default function AdminPage() {
         <StatCard value={S(stats?.workflow_in_audit)}       label="Em auditoria"            color="purple"  />
         <StatCard value={S(stats?.workflow_correction_needed)} label="Correção solicitada"  color="orange"  />
         <StatCard value={S(stats?.workflow_corrected)}      label="Corrigidos"              color="info"    />
-        <StatCard value={S(stats?.workflow_concluded)}      label="Concluídos"              color="accent"  />
-        <StatCard value={S(stats?.workflow_delivered)}      label="Entregues"               color="accent"  />
-        <StatCard value={S(stats?.pending_reviewer_notes)}  label="Notas pendentes"         color="danger"  />
+        <StatCard value={S(stats?.workflow_concluded)}          label="Aprovados p/ entrega"      color="accent"  />
+        <StatCard value={S(stats?.workflow_ready_for_delivery)} label="Prontos para entrega"      color="success" />
+        <StatCard value={S(stats?.workflow_delivered)}          label="Entregues"                 color="accent"  />
+        <StatCard value={S(stats?.workflow_cancelled)}          label="Cancelados"                color="danger"  />
+        <StatCard value={S(stats?.patient_requests_total)}      label="Total de solicitações"     color="info"    />
+        <StatCard value={S(stats?.pending_reviewer_notes)}      label="Notas pendentes"           color="danger"  />
       </div>
 
       {/* Users table */}
@@ -342,6 +345,8 @@ function StatCard({ value, label, color }) {
     danger:  { val: 'var(--danger)',  bg: 'var(--danger-light)'  },
     info:    { val: 'var(--info)',    bg: 'var(--info-light)'    },
     purple:  { val: 'var(--purple)',  bg: 'var(--purple-light)'  },
+    orange:  { val: 'var(--warning)', bg: 'var(--warning-light)' },
+    success: { val: 'var(--accent)',  bg: 'var(--accent-light)'  },
   }
   const c = colorMap[color] || colorMap.accent
   return (

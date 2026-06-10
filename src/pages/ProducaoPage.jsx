@@ -1,6 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/storage'
-import { STATUS_WORKFLOW, ALLOWED_TRANSITIONS_BY_ROLE } from '../lib/storage'
+import {
+  STATUS_WORKFLOW,
+  getAllowedTransitions,
+  applyWorkflowTransition,
+  notifyWorkflowChange,
+} from '../lib/storage'
 import { useAuth } from '../hooks/useAuth'
 import { useAuditLog } from '../hooks/useAuditLog'
 import { format } from 'date-fns'
@@ -28,8 +33,10 @@ const WF_FILTER_OPTIONS = [
 { value: 'not_found',         label: '🔍 Não localizado' },
 { value: 'correction_needed', label: '✏️ Correção solicitada' },
 { value: 'corrected',         label: '🔄 Corrigido' },
-{ value: 'concluded',         label: '🏁 Concluído' },
+{ value: 'concluded',         label: '🏁 Aprovado para entrega' },
+{ value: 'ready_for_delivery', label: '📋 Pronto para entrega' },
 { value: 'delivered',         label: '📦 Entregue' },
+{ value: 'cancelled',         label: '🚫 Cancelado' },
 ]
 
 function WfBadge({ status }) {
@@ -65,20 +72,23 @@ export default function ProducaoPage() {
   const [sortField, sortDir] = sort.split(':')
 
   const userRole = profile?.role ?? 'operador'
-  const allowedTransitions = ALLOWED_TRANSITIONS_BY_ROLE[userRole] ?? {}
 
   const getAvailableActions = (currentStatus) => {
-    const allowed = allowedTransitions[currentStatus] || []
-    return Object.entries(STATUS_WORKFLOW)
-    .filter(([key]) => allowed.includes(key))
-    .map(([key, cfg]) => ({ value: key, label: `${cfg.icon} ${cfg.label}` }))
+    const allowed = getAllowedTransitions(userRole, currentStatus)
+    return allowed.map(key => {
+      const cfg = STATUS_WORKFLOW[key]
+      return { value: key, label: `${cfg?.icon ?? ''} ${cfg?.label ?? key}` }
+    })
   }
 
   const fetchRows = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      const operadorStatuses = ['request_approved', 'in_production', 'not_found', 'correction_needed', 'corrected', 'concluded', 'delivered']
+      const operadorStatuses = [
+        'request_approved', 'in_production', 'not_found', 'correction_needed',
+        'corrected', 'concluded', 'ready_for_delivery', 'delivered', 'cancelled',
+      ]
 
       let q = supabase
       .from('prontuarios')
@@ -126,20 +136,16 @@ export default function ProducaoPage() {
     if (!wfAction || !selected) return
       setSavingWf(true)
       try {
-        const updatePayload = {
-          workflow_status: wfAction,
-          ...(wfActionNote.trim() ? { workflow_note: wfActionNote.trim() } : {}),
-          updated_at: new Date().toISOString(),
-        }
-
-        const { error: err } = await supabase
-        .from('prontuarios')
-        .update(updatePayload)
-        .eq('id', selected.id)
-        if (err) throw err
+        await applyWorkflowTransition({
+          prontuarioId: selected.id,
+          workflowStatus: wfAction,
+          note: wfActionNote.trim() || null,
+          userId: user?.id,
+        })
 
           const cfg = STATUS_WORKFLOW[wfAction]
           await log('workflow_update', `Operador → "${cfg?.label}" · ${selected.record_number}`, selected.id)
+          await notifyWorkflowChange(wfAction, selected, user?.id)
 
           toast.success(`Status: "${cfg?.label}".`)
           setSelected(prev => ({ ...prev, workflow_status: wfAction }))

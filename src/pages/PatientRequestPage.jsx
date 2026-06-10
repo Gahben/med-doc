@@ -263,7 +263,7 @@ export default function PatientRequestPage() {
       const path = `patient_requests/${submittedData.token}_signed.${ext}`
       
       await storageService.upload(signedFile, path)
-      await patientRequestsService.updateSignatureFile(submittedData.id, path)
+      await patientRequestsService.updateSignatureFile(submittedData.token, path)
       
       toast.success('Solicitação enviada com sucesso!')
       setSignedFile(null)

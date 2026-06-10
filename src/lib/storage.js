@@ -31,43 +31,41 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // ==================== STATUS DE FLUXO UNIFICADO ====================
 //
-// Fluxo principal:
+// Fluxo da solicitação do paciente (patient_requests.workflow_status):
 //   received → request_approved / request_rejected
-//   request_approved → in_production → not_found (último caso) OU in_audit
-//   in_audit → correction_needed → corrected → concluded → delivered
-//
-// Quem pode mover para cada status:
-//   REVISOR     : received, request_approved, request_rejected
-//   OPERADOR    : in_production, not_found, corrected, concluded, delivered
-//   AUDITOR     : in_audit, correction_needed, corrected, concluded
-//   ADMIN       : todos
+//   request_approved → in_production
+//   in_production → in_audit / not_found
+//   in_audit → correction_needed / concluded (aprovado para entrega)
+//   correction_needed → corrected → in_audit
+//   concluded → ready_for_delivery → delivered
+//   Qualquer etapa ativa → cancelled
 
 export const STATUS_WORKFLOW = {
-  received:          { label: 'Recebida',            color: 'info',    icon: '📥', order: 1 },
-  request_approved:  { label: 'Solicitação Aprovada', color: 'success', icon: '✅', order: 2 },
-  request_rejected:  { label: 'Solicitação Recusada', color: 'danger',  icon: '❌', order: 2 },
-  in_production:     { label: 'Em Produção',          color: 'warning', icon: '⚙️', order: 3 },
-  not_found:         { label: 'Não Localizado',       color: 'danger',  icon: '🔍', order: 3 },
-  in_audit:          { label: 'Em Auditoria',         color: 'purple',  icon: '🔎', order: 4 },
-  correction_needed: { label: 'Correção Solicitada',  color: 'orange',  icon: '✏️', order: 5 },
-  corrected:         { label: 'Corrigido',            color: 'info',    icon: '🔄', order: 6 },
-  concluded:         { label: 'Concluído',            color: 'success', icon: '🏁', order: 7 },
-  delivered:         { label: 'Entregue',             color: 'success', icon: '📦', order: 8 },
+  received:           { label: 'Recebida',               color: 'info',    icon: '📥', order: 1 },
+  request_approved:     { label: 'Solicitação Aprovada',   color: 'success', icon: '✅', order: 2 },
+  request_rejected:     { label: 'Solicitação Recusada',   color: 'danger',  icon: '❌', order: 2 },
+  in_production:        { label: 'Em Produção',            color: 'warning', icon: '⚙️', order: 3 },
+  not_found:            { label: 'Não Localizado',         color: 'danger',  icon: '🔍', order: 3 },
+  in_audit:             { label: 'Enviado para Auditoria', color: 'purple',  icon: '🔎', order: 4 },
+  correction_needed:    { label: 'Correção Solicitada',    color: 'orange',  icon: '✏️', order: 5 },
+  corrected:            { label: 'Corrigido',              color: 'info',    icon: '🔄', order: 6 },
+  concluded:            { label: 'Aprovado para Entrega',  color: 'success', icon: '🏁', order: 7 },
+  ready_for_delivery:   { label: 'Pronto para Entrega',    color: 'success', icon: '📋', order: 8 },
+  delivered:            { label: 'Entregue',               color: 'success', icon: '📦', order: 9 },
+  cancelled:            { label: 'Cancelado',              color: 'danger',  icon: '🚫', order: 10 },
 }
 
-// Transições permitidas por role
+// Transições específicas por role
 export const ALLOWED_TRANSITIONS_BY_ROLE = {
   revisor: {
     received:         ['request_approved', 'request_rejected'],
-    request_approved: [],
-    request_rejected: [],
+    request_approved: ['in_production'],
   },
   operador: {
     request_approved:  ['in_production'],
     in_production:     ['in_audit', 'not_found'],
     correction_needed: ['corrected'],
     corrected:         ['in_audit'],
-    concluded:         ['delivered'],
   },
   auditor: {
     in_audit:          ['correction_needed', 'concluded'],
@@ -78,6 +76,113 @@ export const ALLOWED_TRANSITIONS_BY_ROLE = {
     acc[k] = Object.keys(STATUS_WORKFLOW).filter(s => s !== k)
     return acc
   }, {}),
+}
+
+// Transições finais disponíveis para todos os perfis
+const SHARED_LATE_TRANSITIONS = {
+  concluded:          ['ready_for_delivery', 'delivered', 'cancelled'],
+  ready_for_delivery: ['delivered', 'cancelled'],
+  received:           ['cancelled'],
+  request_approved:   ['cancelled'],
+  in_production:      ['cancelled'],
+  in_audit:           ['cancelled'],
+  correction_needed:  ['cancelled'],
+  corrected:          ['cancelled'],
+  not_found:          ['cancelled'],
+}
+
+const TERMINAL_WORKFLOW = new Set(['delivered', 'cancelled', 'request_rejected'])
+
+/** Retorna transições permitidas para role + status atual */
+export function getAllowedTransitions(role, currentStatus) {
+  if (!currentStatus || TERMINAL_WORKFLOW.has(currentStatus)) return []
+  const roleMap = ALLOWED_TRANSITIONS_BY_ROLE[role] ?? {}
+  const roleTransitions = roleMap[currentStatus] ?? []
+  const shared = SHARED_LATE_TRANSITIONS[currentStatus] ?? []
+  if (role === 'admin') {
+    return Object.keys(STATUS_WORKFLOW).filter(s => s !== currentStatus)
+  }
+  return [...new Set([...roleTransitions, ...shared])]
+}
+
+/** Gera número do prontuário: AAAAMMDD-XXXX (4 primeiros chars do token) */
+export function generateRecordNumber(token, date = new Date()) {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  const prefix = (token || '').slice(0, 4).toUpperCase()
+  return `${y}${m}${d}-${prefix}`
+}
+
+/** Mantém coluna legada status em patient_requests */
+export function legacyStatusFromWorkflow(workflowStatus) {
+  if (workflowStatus === 'received') return 'pending'
+  if (workflowStatus === 'request_rejected') return 'rejected'
+  if (workflowStatus === 'delivered' || workflowStatus === 'cancelled') return 'completed'
+  if (workflowStatus === 'request_approved') return 'approved'
+  return 'approved'
+}
+
+/** Sincroniza workflow_status entre solicitação e prontuário vinculado */
+export async function applyWorkflowTransition({
+  workflowStatus,
+  note = null,
+  userId = null,
+  patientRequestId = null,
+  prontuarioId = null,
+}) {
+  let reqId = patientRequestId
+  let proId = prontuarioId
+
+  if (proId && !reqId) {
+    const { data } = await supabase
+      .from('prontuarios')
+      .select('patient_request_id')
+      .eq('id', proId)
+      .maybeSingle()
+    reqId = data?.patient_request_id ?? null
+  }
+
+  if (reqId && !proId) {
+    const { data } = await supabase
+      .from('patient_requests')
+      .select('prontuario_id')
+      .eq('id', reqId)
+      .maybeSingle()
+    proId = data?.prontuario_id ?? null
+  }
+
+  const now = new Date().toISOString()
+  const legacyStatus = legacyStatusFromWorkflow(workflowStatus)
+
+  if (reqId) {
+    const { error } = await supabase
+      .from('patient_requests')
+      .update({
+        workflow_status: workflowStatus,
+        status: legacyStatus,
+        notes: note,
+        received_by: userId,
+        received_at: userId ? now : null,
+        updated_at: now,
+      })
+      .eq('id', reqId)
+    if (error) throw error
+  }
+
+  if (proId) {
+    const { error } = await supabase
+      .from('prontuarios')
+      .update({
+        workflow_status: workflowStatus,
+        ...(note ? { workflow_note: note } : {}),
+        updated_at: now,
+      })
+      .eq('id', proId)
+    if (error) throw error
+  }
+
+  return { patientRequestId: reqId, prontuarioId: proId }
 }
 
 // ==================== HELPERS DE CPF ====================
@@ -269,6 +374,9 @@ export const prontuariosService = {
     const path = `${metadata.uploaded_by}/${Date.now()}_${metadata.record_number}.${ext}`
     await storageService.upload(file, path)
 
+    const linkedRequestId = metadata.patient_request_id || null
+    const initialWorkflow = linkedRequestId ? 'in_audit' : (metadata.workflow_status || null)
+
     // 3. Insere registro no banco
     const { data: prontuario, error } = await prontuariosService.create({
       ...metadata,
@@ -277,8 +385,23 @@ export const prontuariosService = {
       file_size: file.size,
       file_hash: fileHash,
       status: 'pending',
+      workflow_status: initialWorkflow,
+      patient_request_id: linkedRequestId,
     })
     if (error) throw error
+
+    if (linkedRequestId) {
+      await supabase
+        .from('patient_requests')
+        .update({
+          prontuario_id: prontuario.id,
+          record_number: metadata.record_number,
+          workflow_status: 'in_audit',
+          status: legacyStatusFromWorkflow('in_audit'),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', linkedRequestId)
+    }
 
     // 4. Cria primeira versão no histórico
     await documentVersionsService.create({
@@ -323,15 +446,20 @@ export const prontuariosService = {
    * Reenvia prontuário corrigido (nova versão)
    */
   resubmit: async (prontuarioId, file, note, userId) => {
+    const { data: current } = await supabase
+      .from('prontuarios')
+      .select('workflow_status, patient_request_id')
+      .eq('id', prontuarioId)
+      .single()
+
     const fileHash = await hashFile(file)
     const ext = file.name.split('.').pop()
     const path = `${userId}/${Date.now()}_resubmit.${ext}`
-    
+
     await storageService.upload(file, path)
 
     const nextVersion = await documentVersionsService.nextVersion(prontuarioId)
 
-    // Atualiza prontuário
     const { error } = await supabase
       .from('prontuarios')
       .update({
@@ -348,7 +476,6 @@ export const prontuariosService = {
       .eq('id', prontuarioId)
     if (error) throw error
 
-    // Registra nova versão
     await documentVersionsService.create({
       prontuario_id: prontuarioId,
       version_number: nextVersion,
@@ -359,6 +486,16 @@ export const prontuariosService = {
       uploaded_by: userId,
       upload_note: note,
     })
+
+    if (current?.workflow_status === 'correction_needed') {
+      await applyWorkflowTransition({
+        prontuarioId,
+        patientRequestId: current.patient_request_id,
+        workflowStatus: 'in_production',
+        note: note?.trim() || null,
+        userId,
+      })
+    }
 
     return true
   },
@@ -787,16 +924,18 @@ export async function notifyWorkflowChange(newStatus, prontuario, actorId) {
 
   // Mapa: status → roles que recebem notificação
   const targetRoles = {
-    received:          ['revisor', 'admin'],
-    request_approved:  ['operador', 'admin'],
-    request_rejected:  ['operador'],
-    in_production:     [],                          // mudança interna do operador
-    not_found:         ['revisor', 'admin'],
-    in_audit:          ['auditor', 'admin'],
-    correction_needed: ['operador'],
-    corrected:         ['auditor'],
-    concluded:         ['admin'],
-    delivered:         ['admin'],
+    received:           ['revisor', 'admin'],
+    request_approved:   ['operador', 'admin'],
+    request_rejected:   ['revisor', 'admin'],
+    in_production:      ['operador', 'admin'],
+    not_found:          ['revisor', 'admin'],
+    in_audit:           ['auditor', 'admin'],
+    correction_needed:  ['operador', 'admin'],
+    corrected:          ['auditor', 'admin'],
+    concluded:          ['operador', 'admin'],
+    ready_for_delivery: ['operador', 'admin'],
+    delivered:          ['admin'],
+    cancelled:          ['admin'],
   }
 
   const roles = targetRoles[newStatus]
@@ -852,6 +991,9 @@ export const patientRequestsService = {
       .insert({
         ...data,
         token,
+        workflow_status: data.workflow_status || 'received',
+        status: 'pending',
+        record_number: generateRecordNumber(token),
       })
 
     if (insertError) return { data: null, error: insertError }
@@ -866,60 +1008,70 @@ export const patientRequestsService = {
   /**
    * Busca solicitação por token (para acompanhamento)
    */
-  getByToken: (token) =>
-    supabase
-      .from('patient_requests')
-      .select('*')
-      .eq('token', token)
-      .single(),
+  getByToken: async (token) => {
+    const { data, error } = await supabase.rpc('get_patient_request_by_token', {
+      p_token: token,
+    })
+    if (error) return { data: null, error }
+    const row = Array.isArray(data) ? data[0] : data
+    return { data: row ?? null, error: row ? null : { message: 'Não encontrado' } }
+  },
 
   /**
    * Lista todas as solicitações (para admins/revisores)
    */
-  list: ({ status = null, search = '', page = 1, perPage = 20 } = {}) => {
+  list: ({ workflowStatus = null, search = '', page = 1, perPage = 20 } = {}) => {
     let query = supabase
       .from('patient_requests')
       .select('*', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range((page - 1) * perPage, page * perPage - 1)
 
-    if (status) query = query.eq('status', status)
+    if (workflowStatus) query = query.eq('workflow_status', workflowStatus)
     if (search) {
       query = query.or(
-        `requester_name.ilike.%${search}%,requester_cpf.ilike.%${search}%,token.ilike.%${search}%`
+        `requester_name.ilike.%${search}%,requester_cpf.ilike.%${search}%,token.ilike.%${search}%,record_number.ilike.%${search}%`
       )
     }
     return query
   },
 
-  /**
-   * Atualiza status da solicitação
-   */
-  updateStatus: (id, status, notes = null, receivedBy = null) =>
+  /** Solicitações elegíveis para vincular no upload */
+  listLinkable: () =>
     supabase
       .from('patient_requests')
-      .update({
-        status,
-        notes,
-        received_by: receivedBy,
-        received_at: receivedBy ? new Date().toISOString() : null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', id)
-      .select()
-      .single(),
+      .select('*')
+      .in('workflow_status', ['request_approved', 'in_production'])
+      .is('prontuario_id', null)
+      .order('created_at', { ascending: false }),
 
   /**
-   * Atualiza caminho do arquivo assinado
+   * Atualiza workflow da solicitação (sincroniza prontuário vinculado)
    */
-  updateSignatureFile: (id, filePath) =>
-    supabase
-      .from('patient_requests')
-      .update({
-        signature_file_path: filePath,
-        updated_at: new Date().toISOString(),
+  updateWorkflowStatus: async (id, workflowStatus, notes = null, userId = null) => {
+    try {
+      await applyWorkflowTransition({
+        patientRequestId: id,
+        workflowStatus,
+        note: notes,
+        userId,
       })
-      .eq('id', id)
-      .select()
-      .single(),
+      return supabase.from('patient_requests').select('*').eq('id', id).single()
+    } catch (error) {
+      return { data: null, error }
+    }
+  },
+
+  /** @deprecated use updateWorkflowStatus */
+  updateStatus: (id, status, notes = null, receivedBy = null) =>
+    patientRequestsService.updateWorkflowStatus(id, status, notes, receivedBy),
+
+  /**
+   * Atualiza caminho do arquivo assinado (RPC para acesso anônimo)
+   */
+  updateSignatureFile: async (token, filePath) =>
+    supabase.rpc('update_patient_request_signature', {
+      p_token: token,
+      p_file_path: filePath,
+    }),
 }

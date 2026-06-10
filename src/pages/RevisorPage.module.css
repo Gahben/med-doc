@@ -178,6 +178,7 @@
 .wf_danger  { background: var(--danger-light); color: var(--danger); }
 .wf_warning { background: #fff3cd; color: #856404; }
 .wf_purple  { background: var(--purple-light); color: var(--purple); }
+.wf_orange  { background: #fff3cd; color: #b45309; }
 .badgeNone  { font-size: 12px; color: var(--text3); }
 
 .btnVer {

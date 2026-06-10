@@ -1,19 +1,20 @@
 import { useState } from 'react'
-import { patientRequestsService } from '../lib/storage'
+import { patientRequestsService, STATUS_WORKFLOW } from '../lib/storage'
 import toast from 'react-hot-toast'
 
 const STATUS_COLORS = {
-  pending: 'bg-yellow-100 text-yellow-800',
-  approved: 'bg-green-100 text-green-800',
-  rejected: 'bg-red-100 text-red-800',
-  completed: 'bg-blue-100 text-blue-800',
-}
-
-const STATUS_LABELS = {
-  pending: 'Pendente',
-  approved: 'Aprovada',
-  rejected: 'Recusada',
-  completed: 'Concluída',
+  received: 'bg-blue-100 text-blue-800',
+  request_approved: 'bg-green-100 text-green-800',
+  request_rejected: 'bg-red-100 text-red-800',
+  in_production: 'bg-yellow-100 text-yellow-800',
+  not_found: 'bg-red-100 text-red-800',
+  in_audit: 'bg-indigo-100 text-indigo-800',
+  correction_needed: 'bg-orange-100 text-orange-800',
+  corrected: 'bg-blue-100 text-blue-800',
+  concluded: 'bg-green-100 text-green-800',
+  ready_for_delivery: 'bg-green-100 text-green-800',
+  delivered: 'bg-green-100 text-green-800',
+  cancelled: 'bg-gray-200 text-gray-700',
 }
 
 export default function PatientTrackingPage() {
@@ -91,8 +92,8 @@ export default function PatientTrackingPage() {
                     <p className="text-sm text-gray-600 mb-1">Token de Acompanhamento</p>
                     <p className="text-3xl font-bold text-blue-600 tracking-wider">{request.token}</p>
                   </div>
-                  <span className={`px-4 py-2 rounded-full text-sm font-semibold ${STATUS_COLORS[request.status]}`}>
-                    {STATUS_LABELS[request.status]}
+                  <span className={`px-4 py-2 rounded-full text-sm font-semibold ${STATUS_COLORS[request.workflow_status] || 'bg-gray-100 text-gray-800'}`}>
+                    {STATUS_WORKFLOW[request.workflow_status]?.label ?? request.workflow_status}
                   </span>
                 </div>
               </div>

@@ -1,6 +1,13 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useDropzone } from 'react-dropzone'
-import { prontuariosService, cpfHelpers } from '../lib/storage'
+import {
+  prontuariosService,
+  patientRequestsService,
+  cpfHelpers,
+  generateRecordNumber,
+  STATUS_WORKFLOW,
+  notifyWorkflowChange,
+} from '../lib/storage'
 import { useAuth } from '../hooks/useAuth'
 import { useAuditLog } from '../hooks/useAuditLog'
 import toast from 'react-hot-toast'
@@ -70,6 +77,30 @@ export default function UploadPage() {
   const [cpfError,      setCpfError]      = useState('')
   const [customSector,  setCustomSector]  = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [linkableRequests, setLinkableRequests] = useState([])
+  const [selectedRequestId, setSelectedRequestId] = useState('')
+
+  useEffect(() => {
+    patientRequestsService.listLinkable().then(({ data }) => {
+      setLinkableRequests(data || [])
+    })
+  }, [success])
+
+  function handleRequestSelect(requestId) {
+    setSelectedRequestId(requestId)
+    if (!requestId) {
+      setForm(INITIAL)
+      return
+    }
+    const req = linkableRequests.find(r => r.id === requestId)
+    if (!req) return
+    setForm(f => ({
+      ...f,
+      patient_name: req.requester_name,
+      patient_cpf: cpfHelpers.format(req.requester_cpf),
+      record_number: req.record_number || generateRecordNumber(req.token, new Date(req.created_at)),
+    }))
+  }
 
   const onDrop = useCallback(accepted => {
     if (accepted[0]) {
@@ -164,14 +195,20 @@ export default function UploadPage() {
         upload_note: form.upload_note,
         locked: form.locked,
         uploaded_by: user.id,
+        patient_request_id: selectedRequestId || null,
       })
 
       setUploadProgress(100)
 
-      // Log de auditoria
+      if (selectedRequestId) {
+        await notifyWorkflowChange('in_audit', prontuario, user.id)
+      }
+
       await log('upload', `Enviou prontuário ${form.record_number} de ${form.patient_name}`, prontuario.id)
 
-      toast.success('Prontuário enviado para revisão!')
+      toast.success(selectedRequestId
+        ? 'Prontuário vinculado e enviado para auditoria!'
+        : 'Prontuário enviado para revisão!')
       setSuccess(true)
     } catch (err) {
       if (err?.message?.includes('duplicado') || err?.message?.includes('Documento duplicado')) {
@@ -195,6 +232,7 @@ export default function UploadPage() {
     setCpfError('')
     setCustomSector(false)
     setUploadProgress(0)
+    setSelectedRequestId('')
   }
 
   if (success) {
@@ -208,7 +246,7 @@ export default function UploadPage() {
             </svg>
           </div>
           <h3>Enviado para revisão!</h3>
-          <p>O prontuário <strong>{form.record_number}</strong> de <strong>{form.patient_name}</strong> foi indexado e está aguardando aprovação de um Auditor.</p>
+          <p>O prontuário <strong>{form.record_number}</strong> de <strong>{form.patient_name}</strong> foi indexado{selectedRequestId ? ' e enviado automaticamente para auditoria' : ''}.</p>
           <BtnAccent onClick={reset}>
             <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
@@ -222,10 +260,36 @@ export default function UploadPage() {
 
   return (
     <div>
-      <PageHeader title="Upload de Prontuário" subtitle="Envie um documento para a fila de revisão" />
+      <PageHeader
+        title="Upload de Prontuário"
+        subtitle="Vincule a uma solicitação aprovada ou em produção e envie o documento"
+      />
 
       <form onSubmit={handleSubmit}>
         <div className={styles.grid}>
+          {linkableRequests.length > 0 && (
+            <div className={styles.fieldsCard}>
+              <Field label="Vincular à solicitação do paciente">
+                <Select
+                  value={selectedRequestId}
+                  onChange={e => handleRequestSelect(e.target.value)}
+                  disabled={loading}
+                >
+                  <option value="">— Upload avulso (sem vínculo) —</option>
+                  {linkableRequests.map(req => (
+                    <option key={req.id} value={req.id}>
+                      {req.token} · {req.requester_name} · {STATUS_WORKFLOW[req.workflow_status]?.label ?? req.workflow_status}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              {selectedRequestId && (
+                <p className={styles.uploadHint} style={{ marginTop: 8 }}>
+                  Ao vincular, o prontuário será enviado automaticamente para auditoria após o upload.
+                </p>
+              )}
+            </div>
+          )}
           {/* Drop zone melhorada */}
           <div
             {...getRootProps()}
@@ -314,10 +378,11 @@ export default function UploadPage() {
 
               <Field label="Número do prontuário" required>
                 <Input
-                  placeholder="Ex.: 2024-00891"
+                  placeholder="AAAAMMDD-XXXX (gerado do token)"
                   value={form.record_number}
                   onChange={e => set('record_number', e.target.value)}
-                  disabled={loading}
+                  disabled={loading || !!selectedRequestId}
+                  readOnly={!!selectedRequestId}
                 />
               </Field>
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { logsService } from '../lib/storage'
+import { logsService, supabase, STATUS_WORKFLOW } from '../lib/storage'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { PageHeader, EmptyState } from '../components/UI'
@@ -55,7 +55,12 @@ export default function LogsPage() {
   const [page,        setPage]        = useState(1)
   const [total,       setTotal]       = useState(0)
   const [exporting,   setExporting]   = useState(false)
+  const [wfStats,     setWfStats]     = useState(null)
   const PER_PAGE = 50
+
+  useEffect(() => {
+    supabase.from('dashboard_stats').select('*').single().then(({ data }) => setWfStats(data))
+  }, [])
 
   const fetchLogs = useCallback(async () => {
     setLoading(true)
@@ -107,6 +112,28 @@ export default function LogsPage() {
           </button>
         }
       />
+
+      {wfStats && (
+        <div className={styles.workflowStats}>
+          {[
+            ['workflow_received', 'received'],
+            ['workflow_in_production', 'in_production'],
+            ['workflow_in_audit', 'in_audit'],
+            ['workflow_correction_needed', 'correction_needed'],
+            ['workflow_concluded', 'concluded'],
+            ['workflow_ready_for_delivery', 'ready_for_delivery'],
+            ['workflow_delivered', 'delivered'],
+            ['workflow_cancelled', 'cancelled'],
+          ].map(([key, status]) => (
+            <div key={key} className={styles.wfStatCard}>
+              <span className={styles.wfStatValue}>{wfStats[key] ?? 0}</span>
+              <span className={styles.wfStatLabel}>
+                {STATUS_WORKFLOW[status]?.icon} {STATUS_WORKFLOW[status]?.label}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Filtros de tipo */}
       <div className={styles.filters}>

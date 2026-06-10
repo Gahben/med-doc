@@ -1,45 +1,43 @@
 /**
- * workflow-webhook — Edge Function para integração com sistema externo de solicitações
- * 
- * Esta função recebe chamadas do portal do solicitante (sistema externo) e atualiza
- * o workflow_status dos prontuários conforme o fluxo avança.
- * 
- * Fluxo de status:
- *   received          → Solicitação recebida pelo sistema externo
- *   request_approved  → Revisor aprovou a solicitação (no sistema externo)
- *   request_rejected  → Revisor rejeitou a solicitação (no sistema externo)
- *   in_production     → Operador está produzindo o prontuário
- *   in_audit          → Auditor está revisando o documento
- *   delivered         → Operador confirmou envio/entrega
- * 
- * O sistema externo chamará esta função via HTTP POST com um Bearer token secreto.
- * O painel do solicitante consome os status via outra rota do sistema externo.
- * 
- * TODO (futuro): conectar com o portal do solicitante via esta edge function.
+ * workflow-webhook — Integração externa com o fluxo unificado de solicitações
+ *
+ * Aceita patient_request_id, token ou prontuario_id/record_number.
+ * Sincroniza patient_requests.workflow_status e prontuarios.workflow_status.
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
-  received:         ['request_approved', 'request_rejected'],
-  request_approved: ['in_production'],
-  request_rejected: [], // terminal — solicitante deve refazer
-  in_production:    ['in_audit'],
-  in_audit:         ['in_production', 'delivered'], // pode voltar para produção
-  delivered:        [], // terminal
+  received:           ['request_approved', 'request_rejected', 'cancelled'],
+  request_approved:   ['in_production', 'cancelled'],
+  request_rejected:   [],
+  in_production:      ['in_audit', 'not_found', 'cancelled'],
+  not_found:          ['cancelled'],
+  in_audit:           ['correction_needed', 'concluded', 'cancelled'],
+  correction_needed:  ['corrected', 'cancelled'],
+  corrected:          ['in_audit', 'concluded', 'cancelled'],
+  concluded:          ['ready_for_delivery', 'delivered', 'cancelled'],
+  ready_for_delivery: ['delivered', 'cancelled'],
+  delivered:          [],
+  cancelled:          [],
 }
 
-// Status que o REVISOR (sistema externo) pode definir
-const REVIEWER_STATUSES = ['received', 'request_approved', 'request_rejected']
+const ROLE_TRANSITIONS: Record<string, string[]> = {
+  revisor:  ['received', 'request_approved', 'request_rejected', 'in_production'],
+  operador: ['in_production', 'not_found', 'corrected', 'ready_for_delivery', 'delivered', 'cancelled'],
+  auditor:  ['in_audit', 'correction_needed', 'corrected', 'concluded', 'cancelled'],
+  admin:    Object.keys(ALLOWED_TRANSITIONS),
+}
 
-// Status que o OPERADOR pode definir
-const OPERATOR_STATUSES = ['in_production', 'delivered']
-
-// Status que o AUDITOR pode definir  
-const AUDITOR_STATUSES = ['in_audit']
+function legacyStatus(workflowStatus: string) {
+  if (workflowStatus === 'received') return 'pending'
+  if (workflowStatus === 'request_rejected') return 'rejected'
+  if (workflowStatus === 'delivered' || workflowStatus === 'cancelled') return 'completed'
+  if (workflowStatus === 'request_approved') return 'approved'
+  return 'approved'
+}
 
 Deno.serve(async (req: Request) => {
-  // CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, {
       headers: {
@@ -62,7 +60,6 @@ Deno.serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const webhookSecret = Deno.env.get('WORKFLOW_WEBHOOK_SECRET')
 
-    // Valida o secret do webhook (quando configurado)
     if (webhookSecret) {
       const providedSecret = req.headers.get('x-webhook-secret')
       if (providedSecret !== webhookSecret) {
@@ -74,97 +71,133 @@ Deno.serve(async (req: Request) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
     const body = await req.json()
-    const { prontuario_id, record_number, workflow_status, caller_role, note } = body
+    const {
+      patient_request_id,
+      token,
+      prontuario_id,
+      record_number,
+      workflow_status,
+      caller_role = 'admin',
+      note,
+      auto_production_on_approve = true,
+    } = body
 
-    // Valida campos obrigatórios
-    if (!workflow_status || (!prontuario_id && !record_number)) {
-      return new Response(
-        JSON.stringify({ error: 'Campos obrigatórios: workflow_status e (prontuario_id ou record_number)' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      )
+    if (!workflow_status) {
+      return new Response(JSON.stringify({ error: 'workflow_status é obrigatório' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      })
     }
 
-    // Busca o prontuário
-    let query = supabase.from('prontuarios').select('id, record_number, workflow_status, status')
+    let patientRequest: Record<string, unknown> | null = null
+    let prontuario: Record<string, unknown> | null = null
+
+    if (patient_request_id) {
+      const { data } = await supabase.from('patient_requests').select('*').eq('id', patient_request_id).maybeSingle()
+      patientRequest = data
+    } else if (token) {
+      const { data } = await supabase.from('patient_requests').select('*').eq('token', String(token).toUpperCase()).maybeSingle()
+      patientRequest = data
+    }
+
     if (prontuario_id) {
-      query = query.eq('id', prontuario_id)
-    } else {
-      query = query.eq('record_number', record_number)
+      const { data } = await supabase.from('prontuarios').select('*').eq('id', prontuario_id).maybeSingle()
+      prontuario = data
+    } else if (record_number) {
+      const { data } = await supabase.from('prontuarios').select('*').eq('record_number', record_number).maybeSingle()
+      prontuario = data
     }
-    const { data: prontuario, error: fetchError } = await query.single()
 
-    if (fetchError || !prontuario) {
-      return new Response(JSON.stringify({ error: 'Prontuário não encontrado' }), {
+    if (!prontuario && patientRequest?.prontuario_id) {
+      const { data } = await supabase.from('prontuarios').select('*').eq('id', patientRequest.prontuario_id).maybeSingle()
+      prontuario = data
+    }
+
+    if (!patientRequest && prontuario?.patient_request_id) {
+      const { data } = await supabase.from('patient_requests').select('*').eq('id', prontuario.patient_request_id).maybeSingle()
+      patientRequest = data
+    }
+
+    if (!patientRequest && !prontuario) {
+      return new Response(JSON.stringify({ error: 'Solicitação ou prontuário não encontrado' }), {
         status: 404,
         headers: { 'Content-Type': 'application/json' },
       })
     }
 
-    // Valida transição de status
-    const currentStatus = prontuario.workflow_status || 'received'
-    const allowedNext = ALLOWED_TRANSITIONS[currentStatus] || []
-    
-    // Se o prontuário ainda não tem workflow_status, qualquer status inicial é válido
-    const isInitial = !prontuario.workflow_status
-    if (!isInitial && !allowedNext.includes(workflow_status)) {
-      return new Response(
-        JSON.stringify({
-          error: `Transição inválida: ${currentStatus} → ${workflow_status}`,
-          allowed_transitions: allowedNext,
-        }),
-        { status: 422, headers: { 'Content-Type': 'application/json' } }
-      )
+    const currentStatus = String(
+      patientRequest?.workflow_status ?? prontuario?.workflow_status ?? 'received'
+    )
+
+    const allowedNext = ALLOWED_TRANSITIONS[currentStatus] ?? []
+    const roleAllowed = ROLE_TRANSITIONS[caller_role] ?? ROLE_TRANSITIONS.admin
+
+    if (!allowedNext.includes(workflow_status)) {
+      return new Response(JSON.stringify({
+        error: `Transição inválida: ${currentStatus} → ${workflow_status}`,
+        allowed_transitions: allowedNext,
+      }), { status: 422, headers: { 'Content-Type': 'application/json' } })
     }
 
-    // Atualiza o workflow_status
-    const updateData: Record<string, unknown> = { workflow_status }
-    
-    const { data: updated, error: updateError } = await supabase
-      .from('prontuarios')
-      .update(updateData)
-      .eq('id', prontuario.id)
-      .select()
-      .single()
+    if (!roleAllowed.includes(workflow_status) && caller_role !== 'admin') {
+      return new Response(JSON.stringify({
+        error: `Role "${caller_role}" não pode definir status "${workflow_status}"`,
+      }), { status: 403, headers: { 'Content-Type': 'application/json' } })
+    }
 
-    if (updateError) throw updateError
+    const statusesToApply = [workflow_status]
+    if (workflow_status === 'request_approved' && auto_production_on_approve) {
+      statusesToApply.push('in_production')
+    }
 
-    // Registra nota do revisor se fornecida
-    if (note && caller_role === 'revisor') {
+    let lastStatus = currentStatus
+    for (const status of statusesToApply) {
+      const now = new Date().toISOString()
+      if (patientRequest?.id) {
+        await supabase.from('patient_requests').update({
+          workflow_status: status,
+          status: legacyStatus(status),
+          notes: note ?? patientRequest.notes,
+          updated_at: now,
+        }).eq('id', patientRequest.id)
+        patientRequest = { ...patientRequest, workflow_status: status }
+      }
+      const proId = prontuario?.id ?? patientRequest?.prontuario_id
+      if (proId) {
+        await supabase.from('prontuarios').update({
+          workflow_status: status,
+          ...(note ? { workflow_note: note } : {}),
+          updated_at: now,
+        }).eq('id', proId)
+      }
+      lastStatus = status
+    }
+
+    if (note && caller_role === 'revisor' && prontuario?.id) {
       await supabase.from('reviewer_notes').insert({
         prontuario_id: prontuario.id,
-        // Usa service role — author_id será null pois é chamada externa
-        // TODO: quando o sistema externo tiver auth, passar o user_id real
         note_text: note,
-        note_type: workflow_status === 'request_rejected' ? 'correction_required' : 
-                   workflow_status === 'request_approved' ? 'info' : 'needs_contact',
+        note_type: workflow_status === 'request_rejected' ? 'correction_required' : 'info',
       })
     }
 
-    // Registra no audit log
     await supabase.from('audit_logs').insert({
       action_type: 'workflow_update',
-      detail: `Workflow atualizado: ${currentStatus} → ${workflow_status}${note ? ` | Nota: ${note}` : ''}`,
-      prontuario_id: prontuario.id,
+      detail: `Webhook: ${currentStatus} → ${lastStatus}${note ? ` | ${note}` : ''}`,
+      prontuario_id: prontuario?.id ?? null,
     })
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        prontuario_id: prontuario.id,
-        record_number: prontuario.record_number,
-        previous_status: currentStatus,
-        workflow_status,
-      }),
-      {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-        },
-      }
-    )
+    return new Response(JSON.stringify({
+      success: true,
+      patient_request_id: patientRequest?.id ?? null,
+      prontuario_id: prontuario?.id ?? patientRequest?.prontuario_id ?? null,
+      previous_status: currentStatus,
+      workflow_status: lastStatus,
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+    })
   } catch (err) {
     console.error('workflow-webhook error:', err)
     return new Response(JSON.stringify({ error: 'Erro interno do servidor' }), {

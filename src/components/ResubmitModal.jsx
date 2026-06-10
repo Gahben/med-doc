@@ -68,7 +68,10 @@ export default function ResubmitModal({ prontuario, onClose, onSuccess }) {
 
       await log('resubmit', `Correção enviada: ${prontuario.record_number} - ${fullNote.substring(0, 80)}`, prontuario.id)
 
-      toast.success('Correção enviada com sucesso!')
+      const backToProduction = prontuario.workflow_status === 'correction_needed'
+      toast.success(backToProduction
+        ? 'Correção enviada! Prontuário voltou para Em Produção.'
+        : 'Correção enviada com sucesso!')
       onSuccess?.()
       onClose()
     } catch (err) {

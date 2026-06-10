@@ -426,6 +426,34 @@
 
 /* Atualizar no BuscaPage.module.css */
 
+.fileSection {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.sectionTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 12px;
+}
+
+.wfBadge {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.wf_info    { background: #e8f4fd; color: #1a5f8a; }
+.wf_success { background: var(--accent-light); color: var(--accent); }
+.wf_danger  { background: var(--danger-light); color: var(--danger); }
+.wf_warning { background: #fff3cd; color: #856404; }
+.wf_purple  { background: var(--purple-light); color: var(--purple); }
+.wf_orange  { background: #fff3cd; color: #b45309; }
+
 /* ─── FILE ACTIONS ────────────────────────────────────────── */
 .fileActions {
   display: flex;
