@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import App from './App'
 import { AuthProvider } from './hooks/useAuth'
+import './styles/tailwind.css'
 import './styles/global.css'
 
 // Debug: verificar se há duas cópias do React

@@ -4,7 +4,6 @@ import LoginPage from './pages/LoginPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import PatientRequestPage from './pages/PatientRequestPage'
 import PatientTrackingPage from './pages/PatientTrackingPage'
-import PatientRequestsAdminPage from './pages/PatientRequestsAdminPage'
 import Layout from './components/Layout'
 import BuscaPage from './pages/BuscaPage'
 import UploadPage from './pages/UploadPage'
@@ -63,9 +62,6 @@ export default function App() {
         } />
         <Route path="admin" element={
           <RequireAuth roles={['admin']}><AdminPage /></RequireAuth>
-        } />
-        <Route path="solicitacoes-pacientes" element={
-          <RequireAuth roles={['admin', 'revisor', 'auditor']}><PatientRequestsAdminPage /></RequireAuth>
         } />
       </Route>
 
