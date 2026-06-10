@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: meddoc
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXTAUTH_SECRET
+        generateValue: true
+      - key: NEXTAUTH_URL
+        value: https://meddoc.onrender.com
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false

@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #f5f3ef;
+  --surface: #ffffff;
+  --surface-2: #f0ede8;
+  --border: #e2ddd6;
+  --text: #1a1916;
+  --text-2: #6b6760;
+  --text-3: #9e9a94;
+  --accent: #1d5c3a;
+  --accent-light: #e8f2ec;
+  --accent-2: #c8832a;
+  --accent-2-light: #fdf3e7;
+  --danger: #c0392b;
+  --danger-light: #fdecea;
+  --warning: #b45309;
+  --warning-light: #fef3c7;
+  --info: #1e40af;
+  --info-light: #dbeafe;
+  --purple: #6d28d9;
+  --purple-light: #ede9fe;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-dm-sans), system-ui, sans-serif;
+  background-color: var(--background);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--surface-2);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-3);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.18s ease;
+}
+
+/* Focus styles */
+input:focus,
+select:focus,
+textarea:focus,
+button:focus {
+  outline: none;
+  ring: 2px;
+  ring-color: var(--accent);
+}
+
+/* Selection */
+::selection {
+  background-color: var(--accent-light);
+  color: var(--accent);
+}

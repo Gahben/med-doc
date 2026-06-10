@@ -811,3 +811,115 @@ export async function notifyWorkflowChange(newStatus, prontuario, actorId) {
     message: `${label}: ${ref}`,
   })
 }
+
+// ==================== SOLICITAÇÕES DE PACIENTES ====================
+// Tabela pública para pacientes solicitarem prontuários sem autenticação
+
+export const patientRequestsService = {
+  /**
+   * Cria uma nova solicitação de paciente com token único
+   */
+  create: async (data) => {
+    // Gera token único de 8 caracteres
+    const generateToken = () => {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // Sem I, 1, O, 0 para evitar confusão
+      let token = ''
+      for (let i = 0; i < 8; i++) {
+        token += chars.charAt(Math.floor(Math.random() * chars.length))
+      }
+      return token
+    }
+
+    let token = generateToken()
+    let attempts = 0
+    const maxAttempts = 10
+
+    // Verifica se o token já existe e gera novo se necessário
+    while (attempts < maxAttempts) {
+      const { data: existing } = await supabase
+        .from('patient_requests')
+        .select('id')
+        .eq('token', token)
+        .maybeSingle()
+      
+      if (!existing) break
+      token = generateToken()
+      attempts++
+    }
+
+    const { error: insertError } = await supabase
+      .from('patient_requests')
+      .insert({
+        ...data,
+        token,
+      })
+
+    if (insertError) return { data: null, error: insertError }
+
+    return supabase
+      .from('patient_requests')
+      .select('*')
+      .eq('token', token)
+      .single()
+  },
+
+  /**
+   * Busca solicitação por token (para acompanhamento)
+   */
+  getByToken: (token) =>
+    supabase
+      .from('patient_requests')
+      .select('*')
+      .eq('token', token)
+      .single(),
+
+  /**
+   * Lista todas as solicitações (para admins/revisores)
+   */
+  list: ({ status = null, search = '', page = 1, perPage = 20 } = {}) => {
+    let query = supabase
+      .from('patient_requests')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range((page - 1) * perPage, page * perPage - 1)
+
+    if (status) query = query.eq('status', status)
+    if (search) {
+      query = query.or(
+        `requester_name.ilike.%${search}%,requester_cpf.ilike.%${search}%,token.ilike.%${search}%`
+      )
+    }
+    return query
+  },
+
+  /**
+   * Atualiza status da solicitação
+   */
+  updateStatus: (id, status, notes = null, receivedBy = null) =>
+    supabase
+      .from('patient_requests')
+      .update({
+        status,
+        notes,
+        received_by: receivedBy,
+        received_at: receivedBy ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single(),
+
+  /**
+   * Atualiza caminho do arquivo assinado
+   */
+  updateSignatureFile: (id, filePath) =>
+    supabase
+      .from('patient_requests')
+      .update({
+        signature_file_path: filePath,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single(),
+}

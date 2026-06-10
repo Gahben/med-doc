@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
 import LoginPage from './pages/LoginPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
+import PatientRequestPage from './pages/PatientRequestPage'
 import Layout from './components/Layout'
 import BuscaPage from './pages/BuscaPage'
 import UploadPage from './pages/UploadPage'
@@ -32,6 +33,7 @@ export default function App() {
 
   return (
     <Routes>
+      <Route path="/solicitacao" element={<PatientRequestPage />} />
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <LoginPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
 
