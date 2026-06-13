@@ -328,7 +328,7 @@ export default function PatientRequestPage() {
           </div>
           
           <p className="text-center text-gray-500 text-xs mt-6">
-            Use o token para acompanhar o status em /acompanhamento
+            Use o token para acompanhar o status da sua solicitação em <span className="font-medium text-indigo-600">/acompanhamento</span>
           </p>
         </div>
       </div>
