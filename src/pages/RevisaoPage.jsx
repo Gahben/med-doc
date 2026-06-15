@@ -459,7 +459,8 @@ export default function RevisaoPage() {
                     <span className={styles.loadingText}>Arquivo não disponível.</span>
                   )}
                 </div>
-                {/* PAINEL DE TRIAGEM DE URGÊNCIA DA IA */}
+              )}
+              {/* PAINEL DE TRIAGEM DE URGÊNCIA DA IA */}
       <div style={{ 
         marginTop: '20px', 
         marginBottom: '20px',
