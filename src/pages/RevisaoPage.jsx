@@ -5,6 +5,7 @@ import {
   getAllowedTransitions,
   applyWorkflowTransition,
   notifyWorkflowChange,
+  aiService
 } from '../lib/storage'
 import { useAuth } from '../hooks/useAuth'
 import { useAuditLog } from '../hooks/useAuditLog'
@@ -71,6 +72,10 @@ export default function RevisaoPage() {
   const [wfAction,     setWfAction]     = useState('')
   const [wfNote,       setWfNote]       = useState('')
   const [savingWf,     setSavingWf]     = useState(false)
+
+  // IA
+  const [auditAlerts, setAuditAlerts] = useState(null)
+  const [loadingAuditAlerts, setLoadingAuditAlerts] = useState(false)
 
   const [sortField, sortDir] = sort.split(':')
 
@@ -146,6 +151,19 @@ export default function RevisaoPage() {
       } finally {
         setLoadingUrl(false)
       }
+    }
+
+    setLoadingAuditAlerts(true)
+    setAuditAlerts(null)
+    try {
+      const res = await aiService.auditChecklist(row.id)
+      if (res.data && res.data.alerts) {
+        setAuditAlerts(res.data.alerts)
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoadingAuditAlerts(false)
     }
   }
 
@@ -399,6 +417,28 @@ export default function RevisaoPage() {
                   </div>
                 )}
               </dl>
+
+              {/* Checklist de Auditoria IA */}
+              <div className={styles.section}>
+                <h4 className={styles.sectionTitle}>Checklist de Auditoria (IA)</h4>
+                {loadingAuditAlerts ? (
+                  <p className={styles.sectionHint}>Analisando metadados do prontuário...</p>
+                ) : auditAlerts && auditAlerts.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {auditAlerts.map((alert, i) => {
+                      const colors = { low: 'var(--info)', medium: 'var(--warning)', high: 'var(--danger)' }
+                      const bgs = { low: 'var(--info-light)', medium: 'var(--warning-light)', high: 'var(--danger-light)' }
+                      return (
+                        <div key={i} style={{ padding: '12px', background: bgs[alert.severity] || bgs.low, color: colors[alert.severity] || colors.low, borderRadius: '6px', fontSize: '14px', border: `1px solid ${colors[alert.severity] || colors.low}` }}>
+                          <strong>Aviso:</strong> {alert.message}
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <p className={styles.sectionHint}>Nenhuma anomalia detectada nos metadados deste prontuário.</p>
+                )}
+              </div>
 
               {/* Arquivo: visualização inline + download + impressão */}
               {current.file_path && (

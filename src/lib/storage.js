@@ -1023,7 +1023,7 @@ export const patientRequestsService = {
   list: ({ workflowStatus = null, search = '', page = 1, perPage = 20 } = {}) => {
     let query = supabase
       .from('patient_requests')
-      .select('*', { count: 'exact' })
+      .select('*, ai_triage_results(*)', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range((page - 1) * perPage, page * perPage - 1)
 
@@ -1075,3 +1075,39 @@ export const patientRequestsService = {
       p_file_path: filePath,
     }),
 }
+
+// ==================== SERVIÇO DE IA ====================
+
+export const aiService = {
+  triage: (patientRequestId) => 
+    supabase.functions.invoke('ai-triage', { body: { patient_request_id: patientRequestId } }),
+
+  generateWhatsAppMessage: (patientRequestId, context) =>
+    supabase.functions.invoke('ai-whatsapp-message', { body: { patient_request_id: patientRequestId, context } }),
+
+  auditChecklist: (prontuarioId) =>
+    supabase.functions.invoke('ai-audit-checklist', { body: { prontuario_id: prontuarioId } }),
+
+  getTriageResult: (patientRequestId) =>
+    supabase.from('ai_triage_results')
+      .select('*')
+      .eq('patient_request_id', patientRequestId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+
+  getLatestSummary: () =>
+    supabase.from('ai_admin_summaries')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+
+  getAnomalies: (limit = 20) =>
+    supabase.from('ai_anomaly_alerts')
+      .select('*')
+      .eq('dismissed', false)
+      .order('created_at', { ascending: false })
+      .limit(limit),
+}
+

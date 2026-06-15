@@ -1,0 +1,123 @@
+{
+  "name": "MedDoc - Detecção de Anomalias",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "id": "cron-trigger-id",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/patient_requests?workflow_status=eq.received&select=*",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "fetch-requests-id",
+      "name": "Fetch Stalled Requests",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\nconst now = new Date();\nconst THRESHOLD_DAYS = 3;\n\nfor (const item of $input.all()) {\n  for (const req of item.json.data || []) {\n    const created = new Date(req.created_at);\n    const diffDays = (now - created) / (1000 * 60 * 60 * 24);\n    \n    if (diffDays > THRESHOLD_DAYS) {\n      results.push({\n        json: {\n          anomaly_type: 'Solicitação Parada',\n          description: `A solicitação token ${req.token} está no status recebido há mais de 3 dias.`,\n          severity: 'medium',\n          raw_data: req\n        }\n      });\n    }\n  }\n}\nreturn results;"
+      },
+      "id": "check-threshold-id",
+      "name": "Check Thresholds",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/ai_anomaly_alerts",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "anomaly_type",
+              "value": "={{$json.anomaly_type}}"
+            },
+            {
+              "name": "description",
+              "value": "={{$json.description}}"
+            },
+            {
+              "name": "severity",
+              "value": "={{$json.severity}}"
+            },
+            {
+              "name": "raw_data",
+              "value": "={{JSON.stringify($json.raw_data)}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "save-anomaly-id",
+      "name": "Save Anomaly",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [900, 300]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Stalled Requests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Stalled Requests": {
+      "main": [
+        [
+          {
+            "node": "Check Thresholds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Thresholds": {
+      "main": [
+        [
+          {
+            "node": "Save Anomaly",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "e2a3b4c5-d6e7-f8g9-h0i1-j2k3l4m5n6o7",
+  "id": "wkf_anomaly_detection",
+  "tags": []
+}

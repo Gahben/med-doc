@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { supabase, profilesService } from '../lib/storage'
+import { supabase, profilesService, aiService } from '../lib/storage'
 import { useAuth } from '../hooks/useAuth'
 import { useAuditLog } from '../hooks/useAuditLog'
 import toast from 'react-hot-toast'
@@ -12,6 +12,9 @@ export default function AdminPage() {
   const [stats,   setStats]   = useState(null)
   const [users,   setUsers]   = useState([])
   const [loading, setLoading] = useState(true)
+
+  const [aiSummary, setAiSummary] = useState(null)
+  const [anomalies, setAnomalies] = useState([])
 
   // Invite
   const [showInvite,  setShowInvite]  = useState(false)
@@ -32,12 +35,16 @@ export default function AdminPage() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [{ data: s }, { data: u }] = await Promise.all([
+    const [{ data: s }, { data: u }, { data: summary }, { data: anomaliesList }] = await Promise.all([
       supabase.from('dashboard_stats').select('*').single(),
       profilesService.list(),
+      aiService.getLatestSummary(),
+      aiService.getAnomalies()
     ])
     setStats(s)
     setUsers(u || [])
+    setAiSummary(summary)
+    setAnomalies(anomaliesList || [])
     setLoading(false)
   }, [])
 
@@ -66,7 +73,7 @@ export default function AdminPage() {
   async function saveEdit() {
     setSaving(true)
     try {
-      const { error } = await profilesService.adminAction('update_role', editUser.id, {
+      const { data, error } = await profilesService.adminAction('update_role', editUser.id, {
         role: editRole,
         active: editActive,
       })
@@ -74,6 +81,13 @@ export default function AdminPage() {
       setUsers(u => u.map(x => x.id === editUser.id ? { ...x, role: editRole, active: editActive } : x))
       toast.success('Usuário atualizado.')
       setEditUser(null)
+
+      const [summaryRes, anomaliesRes] = await Promise.all([
+        aiService.getLatestSummary(),
+        aiService.getAnomalies()
+      ])
+      if (summaryRes.data) setAiSummary(summaryRes.data)
+      if (anomaliesRes.data) setAnomalies(anomaliesRes.data)
     } catch (err) {
       toast.error(err.message || 'Erro ao salvar.')
     } finally {
@@ -334,6 +348,38 @@ export default function AdminPage() {
           </div>
         )}
       </Modal>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '32px' }}>
+        {/* Resumo IA */}
+        <div className={styles.statCard} style={{ gridColumn: '1 / -1', background: 'var(--bg-card)' }}>
+          <h3 className={styles.statTitle}>✨ Resumo Semanal (IA)</h3>
+          {aiSummary ? (
+            <div>
+              <p style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>{aiSummary.summary_text}</p>
+              <small style={{ color: 'var(--text-muted)' }}>Gerado em: {new Date(aiSummary.created_at).toLocaleString('pt-BR')}</small>
+            </div>
+          ) : (
+            <p className={styles.statValue} style={{ fontSize: '1rem', color: 'var(--text-muted)' }}>Nenhum resumo gerado ainda pelo n8n.</p>
+          )}
+        </div>
+
+        {/* Anomalias */}
+        <div className={styles.statCard} style={{ gridColumn: '1 / -1', background: 'var(--bg-card)' }}>
+          <h3 className={styles.statTitle}>⚠️ Alertas de Anomalias</h3>
+          {anomalies && anomalies.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {anomalies.map(a => (
+                <div key={a.id} style={{ padding: '12px', background: 'var(--danger-light)', color: 'var(--danger)', borderRadius: '8px', border: '1px solid var(--danger)' }}>
+                  <strong>{a.anomaly_type}:</strong> {a.description}
+                  <div style={{ fontSize: '12px', marginTop: '4px' }}>Detectado em: {new Date(a.created_at).toLocaleString('pt-BR')}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className={styles.statValue} style={{ fontSize: '1rem', color: 'var(--text-muted)' }}>Nenhuma anomalia pendente.</p>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

@@ -6,6 +6,7 @@ import {
   STATUS_WORKFLOW,
   getAllowedTransitions,
   notifyWorkflowChange,
+  aiService
 } from '../lib/storage'
 import toast from 'react-hot-toast'
 import { useAuth } from '../hooks/useAuth'
@@ -30,6 +31,22 @@ function WfBadge({ status }) {
   )
 }
 
+function WfBadgeUrgency({ level }) {
+  if (!level) return null
+  const cfg = {
+    low: { label: 'Baixa', color: 'info', icon: '🟢' },
+    medium: { label: 'Média', color: 'warning', icon: '🟡' },
+    high: { label: 'Alta', color: 'orange', icon: '🟠' },
+    critical: { label: 'Crítica', color: 'danger', icon: '🔴' }
+  }[level] || { label: level, color: 'info', icon: '' }
+  
+  return (
+    <span className={`${styles.wfBadge} ${styles['wf_' + cfg.color]}`} style={{ marginLeft: '4px' }}>
+      {cfg.icon} {cfg.label}
+    </span>
+  )
+}
+
 function whatsAppUrl(phone, message) {
   const digits = (phone || '').replace(/\D/g, '')
   const withCountry = digits.startsWith('55') ? digits : `55${digits}`
@@ -45,6 +62,11 @@ export default function RevisorPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [notes, setNotes] = useState('')
   const [isUpdating, setIsUpdating] = useState(false)
+  
+  // AI states
+  const [generatedMessage, setGeneratedMessage] = useState('')
+  const [generatingMessage, setGeneratingMessage] = useState(false)
+  const [triaging, setTriaging] = useState(false)
 
   useEffect(() => {
     loadRequests()
@@ -116,6 +138,7 @@ export default function RevisorPage() {
       toast.success(msg)
       setSelectedRequest(null)
       setNotes('')
+      setGeneratedMessage('')
       loadRequests()
     } catch (error) {
       console.error('Erro ao atualizar status:', error)
@@ -144,6 +167,40 @@ export default function RevisorPage() {
     const link = `${window.location.origin}/solicitacao?token=${token}`
     navigator.clipboard.writeText(link)
     toast.success('Link copiado para a área de transferência')
+  }
+
+  const handleGenerateMessage = async () => {
+    if (!selectedRequest) return
+    setGeneratingMessage(true)
+    try {
+      const ctx = selectedRequest.workflow_status === 'request_rejected' ? 'Informar que a solicitação foi recusada e precisamos de correções: ' + notes : 
+                  selectedRequest.workflow_status === 'received' ? 'Informar que recebemos a solicitação e estamos em análise.' :
+                  'Informar sobre o andamento.'
+      const res = await aiService.generateWhatsAppMessage(selectedRequest.id, ctx)
+      if (res.data?.error) throw new Error(res.data.error)
+      setGeneratedMessage(res.data?.message || '')
+      toast.success('Mensagem gerada com sucesso')
+    } catch (err) {
+      console.error(err)
+      toast.error('Erro ao gerar mensagem')
+    } finally {
+      setGeneratingMessage(false)
+    }
+  }
+
+  const handleTriage = async (request) => {
+    setTriaging(true)
+    try {
+      const res = await aiService.triage(request.id)
+      if (res.data?.error) throw new Error(res.data.error)
+      toast.success('Triagem concluída')
+      loadRequests()
+    } catch (err) {
+      console.error(err)
+      toast.error('Erro na triagem')
+    } finally {
+      setTriaging(false)
+    }
   }
 
   const availableActions = selectedRequest
@@ -253,7 +310,12 @@ export default function RevisorPage() {
                         {new Date(request.created_at).toLocaleDateString('pt-BR')}
                       </td>
                       <td>
-                        <WfBadge status={request.workflow_status} />
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <WfBadge status={request.workflow_status} />
+                          {request.ai_triage_results && request.ai_triage_results.length > 0 && (
+                            <WfBadgeUrgency level={request.ai_triage_results[0].urgency_level} />
+                          )}
+                        </div>
                       </td>
                       <td>
                         <div className={styles.actionBtns}>
@@ -261,6 +323,7 @@ export default function RevisorPage() {
                             onClick={() => {
                               setSelectedRequest(request)
                               setNotes(request.notes || '')
+                              setGeneratedMessage('')
                             }}
                             className={styles.btnVer}
                           >
@@ -328,9 +391,54 @@ export default function RevisorPage() {
                   </div>
                   <div>
                     <dt>Status da Solicitação</dt>
-                    <dd><WfBadge status={selectedRequest.workflow_status} /></dd>
+                    <dd>
+                      <WfBadge status={selectedRequest.workflow_status} />
+                      {selectedRequest.ai_triage_results && selectedRequest.ai_triage_results.length > 0 && (
+                        <WfBadgeUrgency level={selectedRequest.ai_triage_results[0].urgency_level} />
+                      )}
+                    </dd>
                   </div>
                 </dl>
+              </div>
+
+              {/* Seção IA */}
+              <div className={styles.section}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h4 className={styles.sectionTitle}>Triagem IA</h4>
+                  {(!selectedRequest.ai_triage_results || selectedRequest.ai_triage_results.length === 0) && (
+                     <button onClick={() => handleTriage(selectedRequest)} disabled={triaging} className={styles.btnVer} style={{ fontSize: '12px' }}>
+                       {triaging ? 'Analisando...' : '✨ Analisar agora'}
+                     </button>
+                  )}
+                </div>
+                {selectedRequest.ai_triage_results && selectedRequest.ai_triage_results.length > 0 ? (
+                  <dl className={styles.detailGrid} style={{ background: 'var(--info-light)', padding: '12px', borderRadius: '8px' }}>
+                    <div className={styles.colSpan2}>
+                      <dt style={{ color: 'var(--info)' }}>Resumo</dt>
+                      <dd>{selectedRequest.ai_triage_results[0].summary}</dd>
+                    </div>
+                    {selectedRequest.ai_triage_results[0].urgency_reason && (
+                      <div className={styles.colSpan2}>
+                        <dt style={{ color: 'var(--info)' }}>Motivo Urgência</dt>
+                        <dd>{selectedRequest.ai_triage_results[0].urgency_reason}</dd>
+                      </div>
+                    )}
+                    {selectedRequest.ai_triage_results[0].inconsistencies && selectedRequest.ai_triage_results[0].inconsistencies.length > 0 && (
+                      <div className={styles.colSpan2}>
+                        <dt style={{ color: 'var(--danger)' }}>Inconsistências Detectadas</dt>
+                        <dd>
+                          <ul style={{ margin: 0, paddingLeft: '16px' }}>
+                            {selectedRequest.ai_triage_results[0].inconsistencies.map((inc, i) => (
+                              <li key={i} style={{ color: 'var(--danger)' }}>{inc}</li>
+                            ))}
+                          </ul>
+                        </dd>
+                      </div>
+                    )}
+                  </dl>
+                ) : (
+                  <p className={styles.sectionHint}>Nenhuma triagem automatizada encontrada para esta solicitação.</p>
+                )}
               </div>
 
               {selectedRequest.contact_phone && (
@@ -339,17 +447,36 @@ export default function RevisorPage() {
                   <p className={styles.sectionHint}>
                     Use o WhatsApp para solicitar correções quando houver divergências nos dados ou no PDF assinado.
                   </p>
-                  <a
-                    href={whatsAppUrl(
-                      selectedRequest.contact_phone,
-                      `Olá ${selectedRequest.requester_name}, somos do setor de prontuários. Precisamos de ajustes na sua solicitação ${selectedRequest.token}.`
-                    )}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`${styles.btnFileAction} ${styles.btnFileActionFull}`}
-                  >
-                    Abrir conversa no WhatsApp
-                  </a>
+                  
+                  {generatedMessage && (
+                    <div style={{ background: 'var(--bg-card)', padding: '12px', borderRadius: '8px', marginBottom: '12px', border: '1px solid var(--border)', whiteSpace: 'pre-wrap' }}>
+                      <strong>Mensagem gerada:</strong><br />
+                      {generatedMessage}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <a
+                      href={whatsAppUrl(
+                        selectedRequest.contact_phone,
+                        generatedMessage || `Olá ${selectedRequest.requester_name}, somos do setor de prontuários. Precisamos de ajustes na sua solicitação ${selectedRequest.token}.`
+                      )}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`${styles.btnFileAction} ${styles.btnFileActionFull}`}
+                    >
+                      Abrir conversa no WhatsApp
+                    </a>
+                    
+                    <button
+                      onClick={handleGenerateMessage}
+                      disabled={generatingMessage}
+                      className={styles.btnFileAction}
+                      style={{ background: 'var(--purple-light)', color: 'var(--purple)', borderColor: 'var(--purple)', flexShrink: 0 }}
+                    >
+                      {generatingMessage ? 'Gerando...' : '✨ Gerar com IA'}
+                    </button>
+                  </div>
                 </div>
               )}
 
