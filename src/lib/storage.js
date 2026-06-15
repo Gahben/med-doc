@@ -998,11 +998,14 @@ export const patientRequestsService = {
 
     if (insertError) return { data: null, error: insertError }
 
-    return supabase
-      .from('patient_requests')
-      .select('*')
-      .eq('token', token)
-      .single()
+    // Contorna o RLS usando o RPC para buscar o registro recém-criado
+    const { data: resultData, error: resultError } = await supabase.rpc('get_patient_request_by_token', {
+      p_token: token,
+    })
+    
+    if (resultError) return { data: null, error: resultError }
+    const row = Array.isArray(resultData) ? resultData[0] : resultData
+    return { data: row ?? null, error: row ? null : { message: 'Não encontrado após criação' } }
   },
 
   /**
