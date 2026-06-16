@@ -6,11 +6,19 @@
  */
 const express = require('express');
 const path    = require('path');
+const rateLimit = require('express-rate-limit');
 const app     = express();
 const PORT    = process.env.PORT || 10000;
 
+// Rate limiting para /health (prevenir abuso)
+const healthLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 100, // limite de 100 requisições por IP
+  message: { error: 'Muitas requisições, tente novamente mais tarde' }
+});
+
 // Health check para UptimeRobot
-app.get('/health', (_req, res) => {
+app.get('/health', healthLimiter, (_req, res) => {
   res.json({
     status:    'ok',
     service:   'meddoc',
@@ -32,6 +40,15 @@ app.use(express.static(path.join(__dirname, 'dist'), {
 // SPA fallback
 app.get(/^(?!\/api).+/, (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+});
+
+// Middleware de erro global
+app.use((err, req, res, next) => {
+  console.error('Server error:', err);
+  res.status(500).json({
+    error: 'Internal Server Error',
+    timestamp: new Date().toISOString()
+  });
 });
 
 app.listen(PORT, '0.0.0.0', () => {
