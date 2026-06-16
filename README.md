@@ -1,702 +1,400 @@
-# MedDoc — Sistema de Gestão de Prontuários Médicos
+# MedDoc - Gestão de Solicitações e Prontuários Médicos
 
-O **MedDoc** é uma aplicação web para hospitais e clínicas que precisam **receber solicitações de pacientes**, **digitalizar prontuários**, **controlar um fluxo de produção interno** e **auditar documentos** antes da entrega — tudo com rastreabilidade (logs, notificações e papéis de acesso distintos).
+O **MedDoc** é uma aplicação web para hospitais, clínicas e equipes administrativas que precisam receber solicitações de cópia de prontuário, acompanhar a produção/digitalização, auditar arquivos antes da entrega e manter rastreabilidade das ações realizadas no processo.
 
-Este repositório contém a **versão principal em produção**: uma **SPA React** (Vite) servida por **Node.js/Express** no **Render**, com backend em **Supabase** (PostgreSQL, Auth, Storage e Edge Functions). O sistema também integra **IA (Gemini)** para triagem automática de solicitações, checklist de auditoria e geração de mensagens WhatsApp.
+Este repositório contém duas bases de aplicação:
 
-> **Nota:** existe uma pasta `meddoc/` com um protótipo antigo em **Next.js**. A aplicação ativa é a da **raiz do repositório** (`src/`, `vite.config.js`, `server.cjs`).
+- **Aplicação ativa na raiz**: SPA React com Vite, servida em produção por um servidor Node/Express mínimo. É a versão mais completa e documentada neste README.
+- **Aplicação Next.js em `meddoc/`**: implementação paralela/protótipo em Next.js 14 com TypeScript, rotas API e NextAuth. Ela continua no repositório, mas não é a aplicação principal configurada no `render.yaml` da raiz.
 
----
+## Sumário
 
-## Índice
+- [Visão geral](#visão-geral)
+- [Stack principal](#stack-principal)
+- [Arquitetura](#arquitetura)
+- [Funcionalidades](#funcionalidades)
+- [Perfis e permissões](#perfis-e-permissões)
+- [Rotas da aplicação React](#rotas-da-aplicação-react)
+- [Fluxo de trabalho](#fluxo-de-trabalho)
+- [Estrutura do repositório](#estrutura-do-repositório)
+- [Como rodar localmente](#como-rodar-localmente)
+- [Variáveis de ambiente](#variáveis-de-ambiente)
+- [Supabase](#supabase)
+- [Edge Functions](#edge-functions)
+- [IA e evidências de avaliação](#ia-e-evidências-de-avaliação)
+- [Automações n8n](#automações-n8n)
+- [Testes](#testes)
+- [Deploy](#deploy)
+- [Aplicação Next.js em meddoc/](#aplicação-nextjs-em-meddoc)
+- [Pontos de atenção](#pontos-de-atenção)
 
-1. [O que o sistema faz](#o-que-o-sistema-faz)
-2. [Para quem é](#para-quem-é)
-3. [Arquitetura](#arquitetura)
-4. [Stack tecnológica](#stack-tecnológica)
-5. [Fluxo de trabalho unificado](#fluxo-de-trabalho-unificado)
-6. [Perfis de usuário e permissões](#perfis-de-usuário-e-permissões)
-7. [Rotas da aplicação](#rotas-da-aplicação)
-8. [Modelo de dados](#modelo-de-dados)
-9. [Estrutura do projeto](#estrutura-do-projeto)
-10. [Como rodar localmente](#como-rodar-localmente)
-11. [Configurar o Supabase](#configurar-o-supabase)
-12. [Deploy em produção](#deploy-em-produção)
-13. [Edge Functions](#edge-functions)
-14. [Features de IA (Gemini)](#features-de-ia-gemini)
-15. [Automações n8n](#automações-n8n)
-16. [Guia para desenvolver e estender](#guia-para-desenvolver-e-estender)
-17. [Estilização (CSS Modules + Tailwind)](#estilização-css-modules--tailwind)
-18. [Solução de problemas](#solução-de-problemas)
-19. [Licença](#licença)
+## Visão geral
 
----
+O sistema cobre dois fluxos conectados:
 
-## O que o sistema faz
+| Área | Quem usa | O que faz |
+| --- | --- | --- |
+| Portal público | Paciente ou responsável | Abre solicitação, gera documento para assinatura, envia PDF assinado e acompanha o andamento por token |
+| Painel interno | Admin, revisor, operador e auditor | Revisa solicitações, produz/digitaliza prontuários, audita documentos, entrega ao paciente e registra logs |
 
-O MedDoc cobre **dois mundos** que conversam entre si:
+A aplicação principal é uma SPA. O navegador conversa diretamente com o Supabase para autenticação, banco, storage e Edge Functions. O servidor Express da raiz não implementa API de negócio; ele serve o build Vite e expõe endpoints simples de saúde.
 
-| Mundo | Quem usa | O que acontece |
-|-------|----------|----------------|
-| **Portal do paciente** | Público (sem login) | Solicita cópia de prontuário, baixa PDF para assinar, envia documento assinado e acompanha status pelo token |
-| **Painel interno** | Equipe do hospital | Revisa solicitações, produz/digitaliza prontuários, audita qualidade e registra entrega |
+## Stack principal
 
-Funcionalidades principais:
+### Frontend ativo
 
-- **Solicitação online** (`/solicitacao`) com geração de token e PDF (jsPDF)
-- **Acompanhamento público** (`/acompanhamento`) pelo token
-- **Painel do revisor** — aprova, recusa ou encaminha para produção (com link WhatsApp)
-- **Upload** vinculado à solicitação, com número de prontuário automático (`AAAAMMDD-XXXX`)
-- **Produção** — operador move o fluxo (auditoria, não localizado, correções)
-- **Auditoria** — auditor aprova para entrega ou solicita correção
-- **Busca** com filtros, visualização de PDF, vínculo com solicitação
-- **Logs de auditoria** exportáveis (CSV/XLSX)
-- **Lixeira** com restauração
-- **Admin** — estatísticas, usuários, convites
-- **Notificações** in-app por mudança de status
-- **Versionamento** de arquivos (histórico de uploads e correções)
-- **Detecção de duplicatas** por hash SHA-256
-- **Contagem automática de páginas** (via pdf-lib)
-- **Notas compartilhadas** em prontuários (com @menções)
-- **IA (Gemini)** — triagem de urgência, checklist de auditoria, geração de mensagens WhatsApp
-- **Automações n8n** — detecção de anomalias e resumo semanal
+- React 18
+- Vite 6
+- React Router 7
+- CSS Modules para telas internas
+- Tailwind CSS 3 para telas públicas
+- Supabase JS
+- react-dropzone
+- react-hot-toast
+- lucide-react
+- framer-motion
+- jsPDF
+- pdf-lib
+- xlsx
+- date-fns
 
----
+### Backend e infraestrutura
 
-## Para quem é
+- Supabase PostgreSQL
+- Supabase Auth
+- Supabase Storage
+- Supabase Edge Functions em Deno
+- Row Level Security (RLS)
+- Node.js/Express para servir `dist/`
+- Render para deploy
+- GitHub Actions para CI
+- n8n para automações externas
+- Google Gemini nas Edge Functions de IA
 
-| Perfil | Responsabilidade no processo |
-|--------|---------------------------|
-| **Paciente / familiar** | Preenche formulário, assina PDF, acompanha andamento |
-| **Revisor** | Confere dados e documento assinado; aprova ou recusa; contato via WhatsApp se houver divergência |
-| **Operador** | Digitaliza/envia prontuário, vincula à solicitação, conduz produção e entrega |
-| **Auditor** | Revisa qualidade do documento digitalizado |
-| **Admin** | Usuários, estatísticas, configurações, resumos de IA |
+### Base Next.js em `meddoc/`
 
----
+- Next.js 14 App Router
+- TypeScript
+- NextAuth
+- Supabase SSR/client
+- Tailwind CSS
+- Radix UI
 
 ## Arquitetura
 
-Visão de alto nível — tudo que acontece quando alguém usa o sistema:
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         NAVEGADOR (usuário)                              │
-│  React 18 SPA  ·  React Router  ·  CSS Modules + Tailwind (rotas públicas)│
-└───────────────────────────────┬─────────────────────────────────────────┘
-                                │ HTTPS
-                                ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    Render — Web Service (Node.js)                        │
-│  server.cjs                                                              │
-│    ├── GET /health, /ping     → monitoramento (UptimeRobot)             │
-│    ├── express.static(dist/)  → arquivos do build Vite                  │
-│    ├── rate-limit /health     → express-rate-limit                      │
-│    └── fallback → index.html  → roteamento client-side (SPA)            │
-└───────────────────────────────┬─────────────────────────────────────────┘
-                                │
-                                ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         Supabase (BaaS)                                  │
-│  ┌─────────────┐  ┌──────────────┐  ┌─────────────┐  ┌──────────────┐ │
-│  │ Auth        │  │ PostgreSQL   │  │ Storage     │  │ Edge Funcs   │ │
-│  │ e-mail/senha│  │ + RLS        │  │ bucket      │  │ invite-user  │ │
-│  │ Google OAuth│  │ profiles,    │  │ prontuarios │  │ admin-actions │ │
-│  │             │  │ prontuarios, │  │ patient_req │  │ workflow-    │ │
-│  │             │  │ patient_req, │  │             │  │  webhook     │ │
-│  │             │  │ ai_triage_   │  │             │  │ cron-clean-  │ │
-│  │             │  │  results…    │  │             │  │  trash       │ │
-│  │             │  │              │  │             │  │ ai-triage    │ │
-│  │             │  │              │  │             │  │ ai-audit-    │ │
-│  │             │  │              │  │             │  │  checklist   │ │
-│  │             │  │              │  │             │  │ ai-whatsapp- │ │
-│  │             │  │              │  │             │  │  message     │ │
-│  └─────────────┘  └──────────────┘  └─────────────┘  └──────────────┘ │
-└─────────────────────────────────────────────────────────────────────────┘
-                                ▲                     ▲
-                                │ CI (opcional)       │ Automação (opcional)
-┌───────────────────────────────┴────────┐  ┌────────┴──────────────────┐
-│  GitHub Actions — build em PR/push     │  │  n8n — detecção anomalia  │
-│  Render redeploy automático no main    │  │  + resumo semanal admin   │
-└────────────────────────────────────────┘  └───────────────────────────┘
+```text
+Paciente / equipe interna
+        |
+        v
+React SPA (Vite, React Router)
+        |
+        +--> Supabase Auth
+        +--> Supabase PostgreSQL + RLS
+        +--> Supabase Storage
+        +--> Supabase Edge Functions
+        |
+        v
+Render Web Service
+server.cjs -> dist/ + /health + /ping
 ```
 
-### Por que essa arquitetura?
+O arquivo mais importante da aplicação ativa é `src/lib/storage.js`. Ele concentra a integração com Supabase e exporta os serviços usados pelas páginas:
 
-- **Frontend estático (Vite)** — build rápido, deploy simples, sem servidor SSR.
-- **Supabase** — banco, autenticação, storage e políticas de segurança (RLS) sem manter backend próprio.
-- **Express mínimo** — só serve arquivos e expõe `/health` (plano Free do Render "dorme" sem tráfego). Inclui rate-limiting via `express-rate-limit`.
-- **`storage.js`** — camada única de integração; trocar Supabase por outro provedor exige mudar basicamente esse arquivo.
-- **Edge Functions com IA** — triagem, auditoria e mensagens automatizadas via Gemini sem infra extra.
+- `authService`
+- `profilesService`
+- `prontuariosService`
+- `patientRequestsService`
+- `workflowService`
+- `documentVersionsService`
+- `logsService`
+- `storageService`
+- `notificationsService`
+- `reviewerNotesService`
+- `prontuarioNotesService`
+- `systemConfigService`
+- `emailService`
+- `aiService`
+- helpers de CPF, hash, paginação de PDF e transição de workflow
 
-### Limites do tier gratuito (referência)
+## Funcionalidades
 
-| Serviço | Plano Free (aprox.) |
-|---------|---------------------|
-| Supabase | ~500 MB banco · ~1 GB Storage · 50k MAU |
-| Render | 750 h/mês Web Service |
-| UptimeRobot | 50 monitores · ping a cada 5 min |
-| GitHub Actions | 2.000 min/mês |
+- Solicitação pública de cópia de prontuário em `/solicitacao`
+- Acompanhamento público por token em `/acompanhamento`
+- Login por e-mail/senha via Supabase Auth
+- Login com Google OAuth, se configurado no Supabase
+- Recuperação e redefinição de senha
+- Painel interno com layout autenticado
+- Busca de prontuários por paciente, CPF e número de registro
+- Upload de documentos por operador/admin
+- Geração de número de prontuário no formato `AAAAMMDD-XXXX`
+- Validação, formatação e máscara de CPF
+- Upload no bucket `prontuarios`
+- Detecção de duplicidade por hash SHA-256
+- Contagem de páginas para PDFs com `pdf-lib`
+- Versionamento de uploads e reenvios
+- Soft delete para lixeira
+- Exclusão permanente com remoção de versões no storage
+- Logs de auditoria com exportação CSV/XLSX
+- Notificações in-app por polling
+- Notas compartilhadas de prontuário com menções
+- Convite e administração de usuários por Edge Function
+- Workflow unificado entre `patient_requests` e `prontuarios`
+- Triagem de solicitações por IA
+- Checklist de auditoria por IA
+- Geração de mensagem WhatsApp por IA
+- Workflows n8n em `n8n-workflows/` para resumo semanal e detecção de anomalias
 
-Para ampliar storage sem custo imediato, veja `supabase/migrations/003_cloudflare_r2_notes.sql` (Cloudflare R2).
+## Perfis e permissões
 
----
+| Perfil | Acesso principal |
+| --- | --- |
+| `admin` | Acesso total ao painel, usuários, estatísticas, logs, lixeira e mudanças de workflow |
+| `revisor` | Revisão de solicitações recebidas, aprovação/recusa e contato com paciente |
+| `operador` | Upload, produção, correção e encaminhamento para auditoria |
+| `auditor` | Revisão de qualidade, logs e lixeira |
+| Público | Solicitação e acompanhamento por token, sem login |
 
-## Stack tecnológica
+As permissões são aplicadas em três camadas:
 
-### Frontend (raiz do projeto)
+- rotas protegidas no React (`RequireAuth` em `src/App.jsx`);
+- regras de transição em `src/lib/storage.js`;
+- políticas RLS nas migrations do Supabase.
 
-| Tecnologia | Uso |
-|------------|-----|
-| **React 18** | Interface e componentes |
-| **Vite 6** | Bundler e dev server |
-| **React Router 7** | Rotas públicas e autenticadas |
-| **CSS Modules** | Estilo das páginas internas (painel) |
-| **Tailwind CSS 3** | Rotas públicas (`/solicitacao`, `/acompanhamento`) |
-| **react-hot-toast** | Feedback visual |
-| **react-dropzone** | Upload por arrastar e soltar |
-| **framer-motion** | Animações de transição |
-| **date-fns** | Datas em português |
-| **jspdf** | Geração do PDF de solicitação |
-| **pdf-lib** | Contagem automática de páginas de PDFs |
-| **lucide-react** | Ícones |
-| **xlsx** | Exportação de planilhas nos logs |
-| **clsx + tailwind-merge** | Utilitários de classes CSS condicionais |
-| **axios** | Requisições HTTP (usado em integrações) |
+## Rotas da aplicação React
 
-### Backend / infra
+| Rota | Tipo | Acesso |
+| --- | --- | --- |
+| `/solicitacao` | Pública | Paciente/responsável |
+| `/acompanhamento` | Pública | Paciente/responsável com token |
+| `/login` | Pública | Usuários internos |
+| `/reset-password` | Pública | Usuários internos |
+| `/` | Protegida | Redireciona para `/busca` |
+| `/busca` | Protegida | Usuário autenticado |
+| `/upload` | Protegida | `admin`, `operador` |
+| `/producao` | Protegida | `admin`, `operador` |
+| `/revisao` | Protegida | `admin`, `auditor` |
+| `/logs` | Protegida | `admin`, `auditor` |
+| `/revisor` | Protegida | `admin`, `revisor` |
+| `/lixeira` | Protegida | `admin`, `auditor` |
+| `/admin` | Protegida | `admin` |
 
-| Tecnologia | Uso |
-|------------|-----|
-| **Supabase** | PostgreSQL, Auth, Storage, RLS, RPC, Edge Functions |
-| **@supabase/supabase-js** | Cliente JavaScript no browser |
-| **Express 5** | Servidor de produção (`server.cjs`) |
-| **express-rate-limit** | Rate limiting no endpoint `/health` |
-| **Node.js 18+** | Runtime |
-| **Gemini (Google AI)** | IA para triagem, auditoria e mensagens (via Edge Functions) |
+## Fluxo de trabalho
 
-### Ferramentas de desenvolvimento
+O workflow principal é controlado por `workflow_status`.
 
-| Ferramenta | Uso |
-|------------|-----|
-| **PostCSS + Autoprefixer** | Pipeline do Tailwind |
-| **Vitest** | Testes unitários (`npm test`) |
-| **GitHub Actions** | CI — `npm ci` + `npm run build` (2 workflows) |
-| **Supabase CLI** | Deploy de Edge Functions |
-| **UptimeRobot** | Keep-alive do Render Free |
-| **n8n** | Automações externas (anomalias, resumos) |
-| **compilador_win.bat** | Script de build + deploy para Windows |
+```text
+received
+  -> request_approved
+      -> in_production
+          -> in_audit
+              -> correction_needed
+                  -> corrected
+                      -> in_audit
+              -> concluded
+                  -> ready_for_delivery
+                      -> delivered
+  -> request_rejected
 
----
-
-## Fluxo de trabalho unificado
-
-O coração do negócio está em **`workflow_status`**, sincronizado entre **`patient_requests`** (solicitação do paciente) e **`prontuarios`** (documento digitalizado), quando vinculados.
-
-### Diagrama do fluxo
-
-```
-                    ┌──────────────┐
-                    │   RECEBIDA   │  ← paciente envia formulário + PDF assinado
-                    └──────┬───────┘
-                           │ Revisor analisa (WhatsApp se necessário)
-              ┌────────────┴────────────┐
-              ▼                         ▼
-    ┌─────────────────┐       ┌─────────────────┐
-    │ SOLICITAÇÃO     │       │ SOLICITAÇÃO     │
-    │ APROVADA        │       │ RECUSADA        │  (fim)
-    └────────┬────────┘       └─────────────────┘
-             │ (auto ao aprovar)
-             ▼
-    ┌─────────────────┐
-    │ EM PRODUÇÃO     │  ← Operador digitaliza / vincula upload
-    └────────┬────────┘
-             │
-     ┌───────┴────────┐
-     ▼                ▼
-┌─────────────┐  ┌──────────────┐
-│ ENVIADO     │  │ NÃO          │
-│ AUDITORIA   │  │ LOCALIZADO   │
-└──────┬──────┘  └──────────────┘
-       │ Auditor
-   ┌───┴────────────────┐
-   ▼                    ▼
-┌──────────────┐  ┌──────────────────┐
-│ CORREÇÃO     │  │ APROVADO P/      │
-│ SOLICITADA   │  │ ENTREGA          │
-└──────┬───────┘  └────────┬─────────┘
-       │ Operador corrige   │
-       ▼                    ▼
-┌──────────────┐  ┌──────────────────┐
-│ CORRIGIDO →  │  │ PRONTO P/        │
-│ volta audit. │  │ ENTREGA          │
-└──────────────┘  └────────┬─────────┘
-                           ▼
-                  ┌──────────────────┐
-                  │ ENTREGUE         │  (fim)
-                  └──────────────────┘
-
-Em qualquer etapa ativa: → CANCELADO (fim)
+Qualquer etapa ativa pode ir para cancelled conforme as regras de perfil.
 ```
 
-### Regras importantes
+### Papéis no fluxo
 
-1. **Aprovar solicitação** → status vai automaticamente para **Em Produção** (dois passos em um clique).
-2. **Upload vinculado** a solicitação aprovada/em produção → prontuário criado já em **Enviado para Auditoria**.
-3. **Número do prontuário** gerado como `AAAAMMDD-XXXX` (data + 4 primeiros caracteres do token).
-4. **Correção de arquivo** (`ResubmitModal`) com status `correction_needed` → volta para **Em Produção** após reenvio.
-5. **`applyWorkflowTransition()`** em `storage.js` mantém solicitação e prontuário alinhados.
+| Etapa | Perfil típico | Ação |
+| --- | --- | --- |
+| `received` | Revisor | Analisa a solicitação inicial |
+| `request_approved` | Revisor/operador | Libera para produção |
+| `in_production` | Operador | Digitaliza ou localiza o documento |
+| `in_audit` | Auditor | Revisa qualidade/metadados |
+| `correction_needed` | Operador | Corrige e reenvia |
+| `concluded` | Operador/admin | Prepara entrega |
+| `ready_for_delivery` | Operador/admin | Finaliza entrega |
+| `delivered` | Sistema/equipe | Encerramento |
 
-### Onde o fluxo é definido no código
+`applyWorkflowTransition()` sincroniza, quando possível, a solicitação (`patient_requests`) e o prontuário (`prontuarios`) vinculados.
 
-| Arquivo | Responsabilidade |
-|---------|------------------|
-| `src/lib/storage.js` | `STATUS_WORKFLOW`, `getAllowedTransitions()`, `applyWorkflowTransition()` |
-| `src/pages/RevisorPage.jsx` | Transições do revisor + WhatsApp |
-| `src/pages/UploadPage.jsx` | Vínculo solicitação → upload → auditoria |
-| `src/pages/ProducaoPage.jsx` | Transições do operador |
-| `src/pages/RevisaoPage.jsx` | Transições do auditor |
-| `supabase/functions/workflow-webhook/` | API externa com o mesmo fluxo |
+## Estrutura do repositório
 
----
-
-## Perfis de usuário e permissões
-
-Existem **4 papéis** internos (`profiles.role`):
-
-| Papel | Menu principal | Pode fazer |
-|-------|----------------|------------|
-| **admin** | Tudo | Qualquer transição de workflow; usuários; lixeira; estatísticas |
-| **revisor** | Solicitações | Aprovar/recusar solicitações; encaminhar produção; WhatsApp |
-| **operador** | Upload, Produção, Busca | Upload (com ou sem vínculo); mover produção; correções; entrega |
-| **auditor** | Auditoria, Logs, Lixeira, Busca | Revisar documentos; solicitar correção; aprovar entrega |
-
-### Matriz resumida
-
-| Ação | Admin | Revisor | Operador | Auditor |
-|------|:-----:|:-------:|:--------:|:-------:|
-| Buscar prontuários | ✅ | ✅ | ✅ | ✅ |
-| Upload de documentos | ✅ | ❌ | ✅ | ❌ |
-| Painel solicitações (`/revisor`) | ✅ | ✅ | ❌ | ❌ |
-| Produção (`/producao`) | ✅ | ❌ | ✅ | ❌ |
-| Auditoria (`/revisao`) | ✅ | ❌ | ❌ | ✅ |
-| Logs | ✅ | ❌ | ❌ | ✅ |
-| Lixeira | ✅ | ❌ | ❌ | ✅ |
-| Admin / usuários | ✅ | ❌ | ❌ | ❌ |
-
-A proteção ocorre em **duas camadas**:
-
-1. **Frontend** — componente `RequireAuth` em `App.jsx` e menus condicionais em `Layout.jsx`
-2. **Backend** — políticas **RLS** no PostgreSQL (Supabase)
-
-> Nunca confie só no frontend. Ao adicionar features, atualize também as políticas RLS.
-
----
-
-## Rotas da aplicação
-
-Definidas em `src/App.jsx`:
-
-### Rotas públicas (sem login)
-
-| Rota | Página | Descrição |
-|------|--------|-----------|
-| `/solicitacao` | `PatientRequestPage` | Formulário + PDF + upload assinado |
-| `/acompanhamento` | `PatientTrackingPage` | Consulta por token |
-| `/login` | `LoginPage` | Autenticação |
-| `/reset-password` | `ResetPasswordPage` | Redefinição de senha |
-
-### Rotas autenticadas (dentro de `Layout`)
-
-| Rota | Página | Roles |
-|------|--------|-------|
-| `/busca` | `BuscaPage` | Todos autenticados |
-| `/upload` | `UploadPage` | admin, operador |
-| `/producao` | `ProducaoPage` | admin, operador |
-| `/revisor` | `RevisorPage` | admin, revisor |
-| `/revisao` | `RevisaoPage` | admin, auditor |
-| `/logs` | `LogsPage` | admin, auditor |
-| `/lixeira` | `LixeiraPage` | admin, auditor |
-| `/admin` | `AdminPage` | admin |
-
-> A rota `/` redireciona automaticamente para `/busca`. Qualquer rota desconhecida redireciona para `/`.
-
----
-
-## Modelo de dados
-
-### Tabelas principais
-
-| Tabela | Descrição |
-|--------|-----------|
-| `profiles` | Perfil do usuário (nome, role, active) — ligado a `auth.users` |
-| `prontuarios` | Documento digitalizado (metadados + `workflow_status` + arquivo) |
-| `patient_requests` | Solicitação do paciente (token, dados, PDF assinado, workflow) |
-| `audit_logs` | Trilha de auditoria (quem fez o quê) |
-| `prontuario_versions` | Histórico de versões de cada prontuário |
-| `reviewer_notes` | Notas do revisor/auditor sobre um prontuário (legado) |
-| `prontuario_notes` | Notas compartilhadas em prontuários (com @menções) |
-| `notifications` | Notificações in-app |
-| `system_config` | Configurações globais (lixeira automática, email, etc.) |
-| `ai_triage_results` | Resultados da triagem automática de IA |
-| `ai_admin_summaries` | Resumos periódicos gerados por IA para o admin |
-| `ai_anomaly_alerts` | Alertas de anomalia detectados por IA |
-
-### Vínculo solicitação ↔ prontuário
-
-```
-patient_requests                    prontuarios
-├── id                              ├── id
-├── token (único, 8 chars)          ├── record_number (AAAAMMDD-XXXX)
-├── workflow_status  ◄────────────► ├── workflow_status
-├── prontuario_id ─────────────────►├── patient_request_id
-├── record_number                   ├── file_path (Storage)
-└── signature_file_path             └── status (pending/approved/reproved — auditoria doc.)
-```
-
-### Dois tipos de "status" (não confundir)
-
-| Campo | Onde | Significado |
-|-------|------|-------------|
-| `workflow_status` | `patient_requests` e `prontuarios` | Etapa do **processo** (recebida → entregue) |
-| `status` | `prontuarios` | Resultado da **auditoria do documento** (`pending`, `approved`, `reproved`, `trash`) |
-| `status` (legado) | `patient_requests` | Mantido para compatibilidade; derivado do workflow |
-
-### Funções SQL úteis (RLS)
-
-Criadas nas migrações `007` e seguintes:
-
-- `is_admin()`, `is_revisor()`, `is_auditor()`, `is_operador()`, `is_active_user()`
-- `current_user_role()`
-- `get_patient_request_by_token(token)` — acompanhamento público
-- `update_patient_request_signature(token, path)` — upload anônimo do PDF assinado
-
----
-
-## Estrutura do projeto
-
-```
-meddoc/                          ← RAIZ — aplicação em produção
-│
-├── src/
-│   ├── App.jsx                  ← Rotas + guards por role
-│   ├── main.jsx                 ← Entry point (Tailwind + global.css)
-│   │
-│   ├── lib/
-│   │   ├── storage.js           ← ★ CAMADA CENTRAL: Supabase, workflow, IA, serviços
-│   │   └── cpfHelpers.test.js   ← Testes unitários (Vitest) do CPF
-│   │
-│   ├── hooks/
-│   │   ├── useAuth.jsx          ← Sessão e perfil do usuário
-│   │   ├── useAuditLog.js       ← Registro de ações
-│   │   └── useNotifications.js  ← Sininho de notificações
-│   │
-│   ├── components/
-│   │   ├── Layout.jsx           ← Navbar + sidebar + notificações
-│   │   ├── Layout.module.css
-│   │   ├── UI.jsx               ← Botões, campos, modais reutilizáveis
-│   │   ├── UI.module.css
-│   │   ├── ResubmitModal.jsx    ← Reenvio de correção de arquivo
-│   │   ├── ResubmitModal.module.css
-│   │   ├── ProntuarioNotes.jsx  ← Notas em prontuários (com @menções)
-│   │   └── ProntuarioNotes.module.css
-│   │
-│   ├── pages/                   ← Uma página por tela (+ CSS Module por página)
-│   │   ├── PatientRequestPage.jsx    (público — Tailwind)
-│   │   ├── PatientTrackingPage.jsx   (público — Tailwind)
-│   │   ├── LoginPage.jsx + .module.css
-│   │   ├── ResetPasswordPage.jsx
-│   │   ├── RevisorPage.jsx + .module.css
-│   │   ├── UploadPage.jsx + .module.css
-│   │   ├── ProducaoPage.jsx + .module.css
-│   │   ├── RevisaoPage.jsx + .module.css
-│   │   ├── BuscaPage.jsx + .module.css
-│   │   ├── LogsPage.jsx + .module.css
-│   │   ├── LixeiraPage.jsx + .module.css
-│   │   └── AdminPage.jsx + .module.css
-│   │
-│   └── styles/
-│       ├── global.css           ← Variáveis CSS, reset, utilitários
-│       └── tailwind.css         ← Diretivas @tailwind
-│
+```text
+.
+├── src/                         # Aplicação React/Vite ativa
+│   ├── components/              # Layout, UI, modal de reenvio, notas
+│   ├── hooks/                   # Auth, audit log, notificações
+│   ├── lib/                     # storage.js e testes de CPF
+│   ├── pages/                   # Páginas públicas e internas
+│   └── styles/                  # Tailwind e CSS global
 ├── supabase/
-│   ├── config.toml              ← Configuração local do Supabase CLI
-│   ├── migrations/              ← Scripts SQL (rodar em ordem no Supabase)
-│   └── functions/               ← Edge Functions (Deno)
-│       ├── invite-user/
-│       ├── admin-actions/
-│       ├── workflow-webhook/
-│       ├── cron-clean-trash/
-│       ├── ai-triage/           ← IA: triagem de urgência (Gemini)
-│       ├── ai-audit-checklist/  ← IA: checklist de auditoria (Gemini)
-│       └── ai-whatsapp-message/ ← IA: mensagens WhatsApp (Gemini)
-│
-├── n8n/                         ← Workflows n8n (versão com Supabase node)
-│   ├── anomaly_detection.json
-│   ├── admin_weekly_summary.json
-│   └── auditor-triage.json
-│
-├── n8n-workflows/               ← Workflows n8n (versão nativa HTTP)
-│   ├── Anomaly_Detection_Native.json
-│   └── Weekly_Summary_Native.json
-│
-├── .github/workflows/
-│   ├── deploy.yml               ← CI: build + deploy (Linux)
-│   └── deploy_win.yml           ← CI: build + deploy (com notas Windows)
-│
+│   ├── migrations/              # Schema, RLS, workflow, IA e storage policies
+│   ├── functions/               # Edge Functions da aplicação ativa
+│   └── config.toml              # Config local do Supabase CLI
 ├── docs/
-│   └── edge-functions.md        ← Documentação detalhada das Edge Functions
-│
+│   └── edge-functions.md        # Documentação detalhada das Edge Functions
 ├── tests/
-│   └── ai_triage/               ← Testes de acurácia da triagem inteligente
-│       ├── dataset.json         ← Dataset de validação com 50 casos em português
-│       ├── REPORT.md            ← Relatório estatístico comprovando os 96% de acertos
-│       └── triageAccuracy.test.js ← Teste automatizado de integridade do dataset
-│
-├── public/
-│   └── favicon.svg
-├── dist/                        ← Build de produção (gerado por Vite)
-│
-├── server.cjs                   ← Express: serve dist/ + /health + rate-limit
-├── index.html                   ← Template HTML (Google Fonts DM Sans/Mono)
-├── vite.config.js
-├── tailwind.config.js
-├── postcss.config.js
-├── render.yaml                  ← Blueprint Render
-├── compilador_win.bat           ← Script de build + git push para Windows
-├── package.json
-└── .env.example                 ← Variáveis necessárias
+│   └── ai_triage/               # Dataset e relatório de avaliação da triagem IA
+├── n8n-workflows/               # Workflows n8n usando HTTP nativo
+├── meddoc/                      # Aplicação Next.js paralela/protótipo
+├── public/                      # Assets públicos
+├── server.cjs                   # Servidor Express para produção da SPA
+├── render.yaml                  # Blueprint Render da aplicação ativa
+├── package.json                 # Scripts e dependências da aplicação ativa
+└── README.md
 ```
-
-### Arquivo mais importante: `storage.js`
-
-Tudo que fala com o Supabase passa por aqui. Serviços exportados:
-
-| Serviço | Função |
-|---------|--------|
-| `authService` | Login, logout, sessão, Google OAuth, reset senha |
-| `profilesService` | Perfis, convites, ações admin (Edge Function) |
-| `prontuariosService` | CRUD, upload, versionamento, resubmit, hash, contagem de páginas |
-| `patientRequestsService` | Solicitações de pacientes (CRUD + vínculo) |
-| `workflowService` | Atualização de workflow em prontuários |
-| `documentVersionsService` | Histórico de versões de uploads |
-| `logsService` | Logs + export CSV/XLSX |
-| `storageService` | Upload/download no bucket Supabase |
-| `notificationsService` | Notificações in-app |
-| `reviewerNotesService` | Notas do revisor (legado) |
-| `prontuarioNotesService` | Notas compartilhadas com @menções |
-| `systemConfigService` | Configurações do sistema (lixeira, email, etc.) |
-| `emailService` | Email via Edge Function (estrutura pronta) |
-| `aiService` | Triagem, checklist de auditoria, WhatsApp, anomalias |
-| `cpfHelpers` | Formatação, validação e máscara de CPF |
-| `applyWorkflowTransition` | Sincroniza solicitação + prontuário |
-| `getAllowedTransitions` | Valida o que cada role pode fazer |
-| `generateRecordNumber` | Gera `AAAAMMDD-XXXX` |
-| `notifyWorkflowChange` | Notifica roles corretos por transição |
-| `hashFile` | SHA-256 de arquivo para detecção de duplicatas |
-| `getPageCount` | Contagem automática de páginas (PDF/imagem) |
-
-**Para trocar de backend** (Firebase, Appwrite, API própria): reimplemente os exports de `storage.js`. As páginas React não precisam mudar.
-
----
 
 ## Como rodar localmente
 
-### Pré-requisitos
+Pré-requisitos:
 
-- **Node.js 18+** (recomendado 20)
-- Conta **Supabase** com projeto criado
-- Git
+- Node.js 18+ (Node 20 recomendado)
+- npm
+- Projeto Supabase configurado
+- Credenciais `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`
 
-### Passos
+Passos:
 
 ```bash
-# 1. Clonar
-git clone https://github.com/SEU_USUARIO/meddoc.git
-cd meddoc
-
-# 2. Instalar dependências
 npm install
-
-# 3. Configurar ambiente
 cp .env.example .env
-# Edite .env com URL e anon key do Supabase
-
-# 4. Subir o dev server
 npm run dev
 ```
 
-Abra o endereço que o Vite mostrar (geralmente `http://localhost:5173`).
+Abra a URL exibida pelo Vite, normalmente `http://localhost:5173`.
 
-### Scripts disponíveis
+### Scripts da raiz
 
 | Comando | Descrição |
-|---------|-----------|
-| `npm run dev` | Servidor de desenvolvimento com hot reload |
-| `npm run build` | Build de produção em `dist/` |
-| `npm run preview` | Pré-visualiza o build localmente |
-| `npm test` | Roda testes unitários (Vitest) |
+| --- | --- |
+| `npm run dev` | Inicia o Vite em modo desenvolvimento |
+| `npm run build` | Gera build em `dist/` |
+| `npm run preview` | Serve o build pelo Vite Preview |
+| `npm test` | Executa testes com Vitest |
 
-### Build alternativo no Windows
-
-Execute `compilador_win.bat` na raiz. Ele faz, em sequência:
-1. Verifica Node.js
-2. Instala dependências
-3. Roda `npm run build`
-4. Commit + push para o GitHub
-
-### Testar build de produção localmente
+### Testar o servidor de produção local
 
 ```bash
 npm run build
 node server.cjs
-# Acesse http://localhost:10000
 ```
 
-### Usuários de demonstração
+O servidor usa `PORT` quando definido; caso contrário, sobe em `10000`.
 
-Após rodar `005_seed_demo_v2.sql`, crie estes usuários em **Auth → Users** (marque *Auto Confirm*):
+Endpoints do servidor:
 
-| E-mail | Senha | Papel |
-|--------|-------|-------|
-| `admin@meddoc.local` | `Admin@123` | admin |
-| `auditor@meddoc.local` | `Auditor@123` | auditor |
-| `revisor@meddoc.local` | `Revisor@123` | revisor |
-| `operador@meddoc.local` | `Operador@123` | operador |
+- `GET /health`
+- `GET /ping`
+- arquivos estáticos de `dist/`
+- fallback para `index.html` nas rotas da SPA
 
----
+## Variáveis de ambiente
 
-## Configurar o Supabase
-
-### 1. Criar projeto
-
-1. [supabase.com](https://supabase.com) → **New project**
-2. Anote **Project URL** e **anon public key** → `.env`
-
-### 2. Rodar migrações (SQL Editor)
-
-Execute **na ordem abaixo**. Se o banco já existir, pule as que já foram aplicadas.
-
-| Ordem | Arquivo | O que faz |
-|-------|---------|-----------|
-| 1 | `001_initial_schema.sql` | Schema base, RLS, storage bucket |
-| 2 | `004_roles_refactor.sql` | Papéis admin/auditor/revisor/operador + workflow |
-| 3 | `003_add_missing_columns.sql` | Colunas extras em prontuários |
-| 4 | `006_workflow_enhancement.sql` | Melhorias de workflow |
-| 5 | `007_update_de RLS_e_Permissões.sql` | Funções RLS (`is_revisor`, etc.) |
-| 6 | `migration_notes_notifications.sql` | Notas e notificações |
-| 7 | `008_patient_requests.sql` | Tabela de solicitações de pacientes |
-| 8 | `009_fix_patient_requests_rls.sql` | Correção RLS das solicitações |
-| 9 | `010_unified_patient_workflow.sql` | Workflow unificado + RPCs públicas |
-| 10 | `011_dashboard_workflow_stats.sql` | View `dashboard_stats` atualizada |
-| 11 | `012_ai_triage_results.sql` | Tabelas de IA (triagem, resumos, anomalias) |
-| 12 | `013_storage_public_upload_policy.sql` | Política de upload público (PDF assinado) |
-| 13 | `014_add_prontuario_notes_to_ai_triage.sql` | Campo `prontuario_notes` na triagem IA |
-
-**Opcionais:**
-
-- `002_seed_demo.sql` / `005_seed_demo_v2.sql` — dados e usuários demo
-- `003_cloudflare_r2_notes.sql` — guia para storage externo
-
-> Arquivos `001_schema.sql` e `001_initial_schema.sql` são variantes do schema inicial — use **apenas um** em instalações novas.
-
-### 3. Storage
-
-O bucket `prontuarios` deve existir (criado na migração inicial). Pastas comuns:
-
-- `{user_id}/...` — uploads de operadores
-- `patient_requests/{token}_signed.pdf` — PDFs assinados pelos pacientes
-
-A migração `013` cria a política que permite upload público (anon) na pasta `patient_requests/`.
-
-### 4. Primeiro administrador
-
-1. **Authentication → Users → Add user**
-2. Copie o UUID
-3. SQL Editor:
-
-```sql
-UPDATE profiles
-SET role = 'admin', name = 'Seu Nome'
-WHERE id = 'cole-o-uuid-aqui';
-```
-
-### 5. Variáveis de ambiente
+Arquivo base: `.env.example`
 
 ```env
-VITE_SUPABASE_URL=https://xxxxx.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOi...
+VITE_SUPABASE_URL=https://seu-projeto.supabase.co
+VITE_SUPABASE_ANON_KEY=sua-chave-anon-publica
 ```
 
-> Variáveis com prefixo `VITE_` são embutidas no build pelo Vite. No Render, configure-as **antes** do deploy.
+Observações:
 
-### 6. Secrets do Supabase (para Edge Functions de IA)
+- Variáveis `VITE_*` são embutidas no build do frontend.
+- A anon key do Supabase pode ficar no frontend, desde que o banco esteja protegido por RLS.
+- Edge Functions de IA usam secrets configurados no Supabase, não no `.env` da SPA.
 
-Para as Edge Functions de IA funcionarem, configure no Supabase:
+Secrets esperados pelas Edge Functions:
 
 ```bash
-supabase secrets set GEMINI_API_KEY=sua-chave-gemini
+supabase secrets set GEMINI_API_KEY=sua-chave
+supabase secrets set WORKFLOW_WEBHOOK_SECRET=seu-segredo
 ```
 
----
+`WORKFLOW_WEBHOOK_SECRET` é usado pelo `workflow-webhook`. `GEMINI_API_KEY` é usado pelas funções de IA.
 
-## Deploy em produção
+## Supabase
 
-### Render (recomendado)
+### Migrations existentes
 
-1. [render.com](https://render.com) → **New → Web Service**
-2. Conecte o repositório GitHub
-3. Configuração:
-   - **Build Command:** `npm ci && npm run build`
-   - **Start Command:** `node server.cjs`
-   - **Plan:** Free
-4. **Environment Variables:**
-   - `VITE_SUPABASE_URL`
-   - `VITE_SUPABASE_ANON_KEY`
-   - `NODE_ENV=production`
-5. Deploy automático a cada push em `main`
+A pasta `supabase/migrations/` contém a evolução do banco:
 
-Ou use o blueprint `render.yaml` na raiz.
+- schemas iniciais;
+- refatoração de papéis;
+- colunas complementares;
+- melhorias de workflow;
+- políticas RLS;
+- notas e notificações;
+- solicitações públicas de pacientes;
+- workflow unificado;
+- estatísticas de dashboard;
+- tabelas de resultados de IA;
+- política de upload público para PDF assinado;
+- campo `prontuario_notes` na triagem IA.
 
-### UptimeRobot (manter Render acordado)
+Arquivos encontrados:
 
-| Campo | Valor |
-|-------|-------|
-| URL | `https://seu-app.onrender.com/health` |
-| Intervalo | 5 minutos |
+```text
+001_initial_schema.sql
+001_schema.sql
+002_seed_demo.sql
+003_add_missing_columns.sql
+003_cloudflare_r2_notes.sql
+004_roles_refactor.sql
+005_seed_demo_v2.sql
+006_workflow_enhancement.sql
+007_update_de RLS_e_Permissões.sql
+008_patient_requests.sql
+009_fix_patient_requests_rls.sql
+010_unified_patient_workflow.sql
+011_dashboard_workflow_stats.sql
+012_ai_triage_results.sql
+013_storage_public_upload_policy.sql
+014_add_prontuario_notes_to_ai_triage.sql
+migration_notes_notifications.sql
+```
 
-### GitHub Actions
+Em uma instalação nova, aplique as migrations em ordem lógica e use apenas uma variante de schema inicial (`001_initial_schema.sql` ou `001_schema.sql`) se houver sobreposição no seu ambiente.
 
-Dois workflows em `.github/workflows/`:
+### Storage
 
-- **`deploy.yml`** — build padrão em PRs e pushes no `main`
-- **`deploy_win.yml`** — mesma coisa, com comentários explicativos para quem usa Windows
+Bucket principal esperado:
 
-Ambos:
-- Rodam `npm run build` com Node 20
-- Usam secrets `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`
-- O Render faz redeploy ao detectar push em `main`
+```text
+prontuarios
+```
 
----
+Usos principais:
+
+- uploads internos de prontuários;
+- versões de documentos;
+- PDFs assinados enviados por pacientes;
+- remoção de arquivos durante exclusão permanente.
+
+### Autenticação
+
+A aplicação ativa usa Supabase Auth diretamente no frontend:
+
+- e-mail/senha;
+- Google OAuth opcional;
+- reset de senha.
+
+O perfil e o papel de acesso ficam na tabela `profiles`.
 
 ## Edge Functions
 
-Funções serverless em `supabase/functions/` (runtime Deno):
+As funções da aplicação ativa ficam em `supabase/functions/`:
 
-| Função | Propósito |
-|--------|-----------|
-| `invite-user` | Convida usuário por e-mail pelo painel admin |
-| `admin-actions` | Ações administrativas (reset senha, desativar, etc.) |
-| `workflow-webhook` | API HTTP para sistemas externos atualizarem workflow |
-| `cron-clean-trash` | Limpeza automática da lixeira (agendar no Supabase) |
-| `ai-triage` | **IA**: Triagem de urgência de solicitações com Gemini |
-| `ai-audit-checklist` | **IA**: Checklist de auditoria de metadados com Gemini |
-| `ai-whatsapp-message` | **IA**: Geração de mensagens WhatsApp com Gemini |
+| Função | Finalidade |
+| --- | --- |
+| `invite-user` | Convite de usuários pelo admin |
+| `admin-actions` | Reset de senha, atualização de papel/status e ações administrativas |
+| `workflow-webhook` | Atualização externa de workflow por webhook com segredo |
+| `cron-clean-trash` | Limpeza automática de prontuários na lixeira |
+| `ai-triage` | Triagem de urgência de solicitações com Gemini |
+| `ai-audit-checklist` | Checklist/anomalias de auditoria com Gemini |
+| `ai-whatsapp-message` | Geração de mensagem para WhatsApp com Gemini |
 
-### Deploy
+A documentação detalhada de payloads e respostas está em `docs/edge-functions.md`.
+
+Deploy típico:
 
 ```bash
-npm install -g supabase
 supabase login
 supabase link --project-ref SEU_PROJECT_REF
 supabase functions deploy invite-user
@@ -708,209 +406,145 @@ supabase functions deploy ai-audit-checklist
 supabase functions deploy ai-whatsapp-message
 ```
 
-### Webhook de workflow (exemplo)
+## IA e evidências de avaliação
 
-```bash
-curl -X POST https://SEU_PROJETO.supabase.co/functions/v1/workflow-webhook \
-  -H "Content-Type: application/json" \
-  -H "x-webhook-secret: SEU_SECRET" \
-  -d '{
-    "token": "ABCD1234",
-    "workflow_status": "request_approved",
-    "caller_role": "revisor",
-    "note": "Aprovado via integração"
-  }'
-```
+O projeto usa **Google Gemini** nas Edge Functions:
 
-Com `auto_production_on_approve: true` (padrão), aprovação também move para **Em Produção**.
+- `ai-triage`: classifica urgência (`low`, `medium`, `high`, `critical`), resume a solicitação e aponta inconsistências;
+- `ai-audit-checklist`: avalia metadados e histórico de versões para alertas de auditoria;
+- `ai-whatsapp-message`: redige mensagens profissionais para contato com o paciente.
 
----
+Há evidência local de avaliação da triagem em:
 
-## Features de IA (Gemini)
+- `tests/ai_triage/dataset.json`
+- `tests/ai_triage/REPORT.md`
+- `tests/ai_triage/triageAccuracy.test.js`
 
-O MedDoc integra o **Google Gemini** (modelo `gemini-2.5-flash`) via Edge Functions para 3 features:
-
-### 1. Triagem automática de solicitações (`ai-triage`)
-
-Analisa os dados da solicitação do paciente e retorna:
-- **Nível de urgência** (`low`, `medium`, `high`, `critical`)
-- **Justificativa** do nível
-- **Resumo** da solicitação
-- **Inconsistências** detectadas nos dados
-
-Resultados são salvos na tabela `ai_triage_results` e exibidos no painel do revisor.
-
-### 2. Checklist de auditoria (`ai-audit-checklist`)
-
-Analisa os **metadados** do prontuário (sem acesso ao conteúdo clínico) e retorna alertas:
-- Prontuário com poucas páginas para o tipo de documento
-- Reenvios em intervalo muito curto
-- Diminuição drástica de tamanho entre versões
-
-### 3. Mensagens WhatsApp (`ai-whatsapp-message`)
-
-Gera mensagens profissionais e acolhedoras para contato com o paciente via WhatsApp, incluindo o token de acompanhamento.
-
-### Uso no código
-
-```javascript
-import { aiService } from '../lib/storage'
-
-// Triagem
-const { data } = await aiService.triage(patientRequestId)
-
-// Checklist de auditoria
-const { data } = await aiService.auditChecklist(prontuarioId)
-
-// Mensagem WhatsApp
-const { data } = await aiService.generateWhatsAppMessage(requestId, 'Contexto da situação')
-
-// Consultar resultado de triagem
-const { data } = await aiService.getTriageResult(patientRequestId)
-
-// Resumo semanal do admin
-const { data } = await aiService.getLatestSummary()
-
-// Alertas de anomalia
-const { data } = await aiService.getAnomalies(20)
-```
-
-> **Pré-requisito:** configure `GEMINI_API_KEY` nos secrets do Supabase.
-
----
+O relatório registra 50 casos simulados em português e 48 classificações corretas, resultando em **96% de acurácia**. O teste automatizado atual valida a estrutura e integridade do dataset; ele não executa chamadas reais ao Gemini durante `npm test`.
 
 ## Automações n8n
 
-O projeto inclui workflows n8n para automações que rodam externamente ao app:
-
-### Pasta `n8n/` (Supabase node)
+O repositório mantém apenas a pasta `n8n-workflows/`, com workflows importáveis no n8n usando nós HTTP nativos.
 
 | Arquivo | Descrição |
-|---------|-----------|
-| `anomaly_detection.json` | Detecta anomalias em prontuários e solicitações |
-| `admin_weekly_summary.json` | Gera resumo semanal para o admin |
-| `auditor-triage.json` | Triagem automática para o auditor |
+| --- | --- |
+| `Anomaly_Detection_Native.json` | Detecção de anomalias usando nós HTTP nativos |
+| `Weekly_Summary_Native.json` | Resumo semanal usando nós HTTP nativos |
 
-### Pasta `n8n-workflows/` (HTTP nativo)
+Os workflows devem ser importados no n8n e configurados com as credenciais/URLs do ambiente Supabase em uso.
 
-| Arquivo | Descrição |
-|---------|-----------|
-| `Anomaly_Detection_Native.json` | Versão nativa HTTP da detecção de anomalias |
-| `Weekly_Summary_Native.json` | Versão nativa HTTP do resumo semanal |
+## Testes
 
-> Importe os arquivos JSON na interface do n8n para ativar as automações.
+Framework configurado: Vitest.
 
----
+Testes existentes:
 
-## Guia para desenvolver e estender
+- `src/lib/cpfHelpers.test.js`: valida helpers de CPF exportados por `storage.js`;
+- `tests/ai_triage/triageAccuracy.test.js`: valida dataset de avaliação da triagem IA.
 
-### Adicionar um novo status de workflow
+Comando:
 
-1. **`storage.js`** — inclua em `STATUS_WORKFLOW`
-2. **`ALLOWED_TRANSITIONS_BY_ROLE`** — defina quem pode mover para/de esse status
-3. **`SHARED_LATE_TRANSITIONS`** — se for status compartilhado no fim do fluxo
-4. **Migração SQL** — `ALTER TYPE workflow_status ADD VALUE` e/ou `CHECK` em `patient_requests`
-5. **Páginas** — filtros em `ProducaoPage`, `RevisaoPage`, `RevisorPage`, `AdminPage`
-6. **`notifyWorkflowChange`** — quem deve ser notificado
-7. **`workflow-webhook/index.ts`** — manter paridade com o frontend
+```bash
+npm test
+```
 
-### Adicionar uma nova página interna
+Importante: `cpfHelpers.test.js` importa `src/lib/storage.js`, e esse módulo exige `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` no carregamento. Para rodar a suíte, mantenha `.env` configurado.
+
+## Deploy
+
+### Render
+
+O deploy principal da raiz usa `render.yaml`:
+
+```yaml
+buildCommand: npm ci && npm run build
+startCommand: node server.cjs
+```
+
+Variáveis no Render:
 
 ```text
-1. Criar src/pages/MinhaPage.jsx + MinhaPage.module.css
-2. Importar em App.jsx e adicionar <Route>
-3. Se restrita: envolver com <RequireAuth roles={[...]}>
-4. Adicionar link em Layout.jsx (condicional ao role)
-5. Se acessar dados: usar serviços de storage.js
-6. Se nova tabela: criar migração + políticas RLS
+VITE_SUPABASE_URL
+VITE_SUPABASE_ANON_KEY
+NODE_ENV=production
 ```
 
-### Adicionar campo na solicitação do paciente
+Health check recomendado:
 
-1. Coluna na migração SQL (`patient_requests`)
-2. Formulário em `PatientRequestPage.jsx`
-3. `patientRequestsService.create()` — incluir o campo
-4. Exibição em `RevisorPage.jsx` e `PatientTrackingPage.jsx`
-
-### Registrar ação no log de auditoria
-
-```javascript
-import { useAuditLog } from '../hooks/useAuditLog'
-
-const log = useAuditLog()
-await log('workflow_update', 'Descrição legível da ação', prontuarioId)
+```text
+/health
 ```
 
-Tipos em `audit_action` enum: `upload`, `download`, `approved`, `workflow_update`, `resubmit`, etc.
+### GitHub Actions
 
-### Boas práticas do projeto
+Workflows existentes:
 
-- **Mudanças de workflow** → sempre usar `applyWorkflowTransition()`, nunca atualizar só uma tabela
-- **Upload vinculado** → passar `patient_request_id` em `createWithVersion()`
-- **Estilo interno** → preferir CSS Modules (`*.module.css`), não Tailwind
-- **Rotas públicas** → Tailwind já configurado em `tailwind.config.js`
-- **Segurança** → toda tabela nova precisa de RLS antes de ir para produção
-- **Testes** → rodar `npm test` antes de fazer push
+- `.github/workflows/deploy.yml`
+- `.github/workflows/deploy_win.yml`
 
----
+Ambos rodam em pushes e pull requests para `main`, instalam dependências com `npm ci`, executam `npm run build` com Node 20 e publicam `dist/` como artifact temporário.
 
-## Estilização (CSS Modules + Tailwind)
+O Render faz o redeploy automaticamente quando detecta push no branch configurado.
 
-O projeto usa **duas estratégias** de CSS de propósito:
+### Script Windows
 
-| Área | Tecnologia | Arquivos |
-|------|------------|----------|
-| Painel interno (login, busca, upload…) | **CSS Modules** | `src/pages/*.module.css`, `src/components/*.module.css` |
-| Portal do paciente | **Tailwind CSS** | classes utilitárias em `PatientRequestPage`, `PatientTrackingPage` |
+`compilador_win.bat` automatiza fluxo local de build/deploy para Windows. Revise o conteúdo antes de usar, porque scripts desse tipo podem incluir commit/push.
 
-Variáveis globais de design (`--accent`, `--surface`, etc.) estão em `src/styles/global.css`.
+## Aplicação Next.js em meddoc/
 
-Tipografia: **DM Sans** e **DM Mono** (Google Fonts, carregadas no `index.html`).
+A pasta `meddoc/` contém outra aplicação:
 
-Ordem de import em `main.jsx`:
-
-```javascript
-import './styles/tailwind.css'  // primeiro — base Tailwind
-import './styles/global.css'  // depois — tema MedDoc
+```text
+meddoc/
+├── src/app/                 # App Router
+├── src/app/api/             # API routes
+├── src/components/          # Providers/componentes
+├── src/lib/                 # Supabase/auth/utils
+├── src/types/               # Tipos TypeScript
+├── supabase/schema.sql      # Schema próprio da base Next
+├── supabase/functions/      # move-to-trash e permanent-delete
+├── package.json
+└── render.yaml
 ```
 
----
+Scripts:
 
-## Solução de problemas
+```bash
+cd meddoc
+npm install
+npm run dev
+npm run build
+npm start
+```
 
-| Problema | Causa provável | Solução |
-|--------|----------------|---------
-| Tela branca ao iniciar | `.env` ausente ou inválido | Copie `.env.example` → `.env` com credenciais corretas |
-| Build falha no Render | Env vars não definidas | Configure `VITE_*` no dashboard **antes** do build |
-| Paciente não acha solicitação | Migração 010 não aplicada | Rode `010_unified_patient_workflow.sql` (RPC pública) |
-| Erro ao atualizar status | RLS desatualizado | Rode `009` e `010` |
-| Estilo quebrado em `/solicitacao` | Tailwind não processado | Verifique `postcss.config.js` e `tailwind.config.js` |
-| Upload não vai para auditoria | Solicitação não vinculada | Selecione solicitação no dropdown do Upload |
-| Render "dorme" | Plano Free sem tráfego | Configure UptimeRobot em `/health` |
-| `duplicate key` no upload | `record_number` já existe | Número é único; use vínculo com solicitação |
-| IA não funciona (triagem/auditoria) | `GEMINI_API_KEY` não configurada | `supabase secrets set GEMINI_API_KEY=...` |
-| Upload do PDF assinado falha | Migração 013 não aplicada | Rode `013_storage_public_upload_policy.sql` |
+Rotas e áreas encontradas:
 
-### Logs úteis
+- `/login`
+- `/dashboard`
+- `/dashboard/busca`
+- `/dashboard/upload`
+- `/dashboard/revisao`
+- `/dashboard/usuarios`
+- `/dashboard/logs`
+- `/dashboard/config`
+- APIs em `/api/auth`, `/api/documents`, `/api/review`, `/api/admin/*`, `/api/health`
 
-- **Browser** — DevTools → Console e Network
-- **Supabase** — Dashboard → Logs → Postgres / API / Edge Functions
-- **Render** — Dashboard → Logs do serviço
+Variáveis esperadas pela base Next.js, conforme `meddoc/README.md` e `meddoc/render.yaml`:
 
----
+```text
+NEXTAUTH_SECRET
+NEXTAUTH_URL
+SUPABASE_URL
+SUPABASE_SERVICE_ROLE_KEY
+SUPABASE_ANON_KEY
+```
 
-## Licença
+Essa base tem `render.yaml` próprio com health check em `/api/health`, mas não é o deploy principal descrito pelo `render.yaml` da raiz.
 
-MIT — use, modifique e distribua livremente.
+## Pontos de atenção
 
----
-
-## Contribuindo
-
-1. Fork do repositório
-2. Branch: `git checkout -b feat/minha-feature`
-3. `npm run build` deve passar sem erros
-4. `npm test` deve passar
-5. Pull Request para `main` com descrição clara do que mudou
-
-Dúvidas sobre o fluxo? Comece lendo `src/lib/storage.js` (workflow + IA) e `src/App.jsx` (rotas). São os dois melhores pontos de entrada para entender o sistema inteiro.
+- Há arquivos com texto corrompido por encoding em comentários/documentos antigos. Este README foi reescrito em português legível.
+- A aplicação ativa não possui backend REST próprio para regras de negócio; a maior parte do acesso acontece via Supabase JS e Edge Functions.
+- O teste de acurácia da IA não chama o provedor real; ele valida o dataset e acompanha o relatório de evidência.
+- O repositório contém `dist/` e `node_modules/` no ambiente local atual, mas eles são artefatos/dependências geradas.
+- Existem duas bases com stacks diferentes. Para desenvolvimento da versão atual, trabalhe primeiro na raiz (`src/`, `supabase/`, `server.cjs`).
