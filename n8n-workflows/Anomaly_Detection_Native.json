@@ -1,0 +1,157 @@
+{
+  "name": "Detecção de Anomalias - Nativo Supabase",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 12
+            }
+          ]
+        }
+      },
+      "id": "trigger-anomalies",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "table": "document_versions",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "created_at",
+              "condition": "gte",
+              "keyValue": "={{$today.minus({hours: 24}).toISODate()}}"
+            }
+          ]
+        }
+      },
+      "id": "get-versions",
+      "name": "Get Document Versions",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        420,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "aggregateItems",
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {
+              "fieldToAggregate": "prontuario_id"
+            },
+            {
+              "fieldToAggregate": "file_size"
+            },
+            {
+              "fieldToAggregate": "version_number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "item-lists-2",
+      "name": "Item Lists",
+      "type": "n8n-nodes-base.itemLists",
+      "typeVersion": 3,
+      "position": [
+        640,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "model": "gemini-2.5-flash",
+        "prompt": "={{ 'Analise o histórico de versões e identifique anomalias (ex: arquivo de 50MB virar 10KB na versão seguinte, ou muitas versões seguidas). Retorne apenas um JSON: { anomalies: [ { prontuario_id: \"...\", alert: \"...\" } ] }\\nDados:\\n' + JSON.stringify($json) }}"
+      },
+      "id": "gemini-anomaly",
+      "name": "Gemini Anomaly Detection",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1,
+      "position": [
+        860,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "prontuario_notes",
+        "columns": "prontuario_id, author_id, note_type, content",
+        "data": {
+          "prontuario_id": "={{ $json.output.anomalies[0].prontuario_id }}",
+          "author_id": "00000000-0000-0000-0000-000000000000",
+          "note_type": "correction_required",
+          "content": "={{ 'ALERTA DE ANOMALIA N8N: ' + $json.output.anomalies[0].alert }}"
+        }
+      },
+      "id": "save-anomaly",
+      "name": "Save Anomaly Note",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1080,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Document Versions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Document Versions": {
+      "main": [
+        [
+          {
+            "node": "Item Lists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Item Lists": {
+      "main": [
+        [
+          {
+            "node": "Gemini Anomaly Detection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Anomaly Detection": {
+      "main": [
+        [
+          {
+            "node": "Save Anomaly Note",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -152,11 +152,11 @@ export default function ProntuarioNotes({ prontuarioId, prontuario }) {
         {!loading && notes.map(n => {
           const isOwn = n.author_id === user?.id
           
-          // Identifica se a nota veio do Robô/IA (n8n) baseado no conteúdo ou papel do autor
-          const isAI = n.body?.includes('[Análise de Compliance') || n.profiles?.role === 'auditor'
+          // Identifica se a nota veio do Sistema/IA baseado no conteúdo
+          const isAI = n.body?.includes('[Análise de Compliance') || n.body?.startsWith('[Sistema -') || n.body?.startsWith('[Transição para') || n.profiles?.name === 'MED-DOC IA'
           const isExpanded = expandedNotes[n.id]
 
-          // Se for nota de IA, renderiza com comportamento EXPANSÍVEL
+          // Se for nota de IA/Sistema, renderiza com comportamento EXPANSÍVEL
           if (isAI) {
             return (
               <div 

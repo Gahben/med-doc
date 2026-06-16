@@ -10,6 +10,7 @@ import {
 } from '../lib/storage'
 import toast from 'react-hot-toast'
 import { useAuth } from '../hooks/useAuth'
+import { useAuditLog } from '../hooks/useAuditLog'
 import styles from './RevisorPage.module.css'
 import { PageHeader, EmptyState } from '../components/UI'
 
@@ -55,6 +56,7 @@ function whatsAppUrl(phone, message) {
 
 export default function RevisorPage() {
   const { user } = useAuth()
+  const log = useAuditLog()
   const [requests, setRequests] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedRequest, setSelectedRequest] = useState(null)
@@ -92,6 +94,12 @@ export default function RevisorPage() {
 
   const handleUpdateStatus = async (newStatus) => {
     if (!selectedRequest) return
+
+    if (newStatus === 'request_rejected' || newStatus === 'cancelled') {
+      if (!window.confirm(`ATENÇÃO: Deseja realmente mudar o status para "${STATUS_WORKFLOW[newStatus]?.label}"?\n\nIsso exigirá nova ação do paciente ou interromperá o fluxo.`)) {
+        return;
+      }
+    }
 
     setIsUpdating(true)
     try {
@@ -449,9 +457,15 @@ export default function RevisorPage() {
                   </p>
                   
                   {generatedMessage && (
-                    <div style={{ background: 'var(--bg-card)', padding: '12px', borderRadius: '8px', marginBottom: '12px', border: '1px solid var(--border)', whiteSpace: 'pre-wrap' }}>
-                      <strong>Mensagem gerada:</strong><br />
-                      {generatedMessage}
+                    <div style={{ marginBottom: '12px' }}>
+                      <label style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>Mensagem gerada (pode editar):</label>
+                      <textarea
+                        value={generatedMessage}
+                        onChange={(e) => setGeneratedMessage(e.target.value)}
+                        rows={4}
+                        className={styles.textarea}
+                        style={{ width: '100%', background: 'var(--purple-light)', borderColor: 'var(--purple)' }}
+                      />
                     </div>
                   )}
 
@@ -464,6 +478,7 @@ export default function RevisorPage() {
                       target="_blank"
                       rel="noopener noreferrer"
                       className={`${styles.btnFileAction} ${styles.btnFileActionFull}`}
+                      onClick={() => log('whatsapp_opened', `WhatsApp aberto para solicitação ${selectedRequest.token}`, selectedRequest.prontuario_id)}
                     >
                       Abrir conversa no WhatsApp
                     </a>

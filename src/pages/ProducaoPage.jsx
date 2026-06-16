@@ -13,7 +13,8 @@ import { ptBR } from 'date-fns/locale'
 import toast from 'react-hot-toast'
 import { PageHeader, EmptyState } from '../components/UI'
 import ResubmitModal from '../components/ResubmitModal'
-import styles from './RevisorPage.module.css'
+import ProntuarioNotes from '../components/ProntuarioNotes'
+import styles from './ProducaoPage.module.css'
 
 const PAGE_SIZE = 20
 
@@ -330,6 +331,12 @@ export default function ProducaoPage() {
         <p className={styles.sectionHint}>Nenhuma ação disponível para este status.</p>
       )}
       </div>
+
+      {/* Prontuario Notes */}
+      <div className={styles.section} style={{ marginTop: '24px' }}>
+        <ProntuarioNotes prontuarioId={selected.id} prontuario={selected} />
+      </div>
+
       </div>
       </div>
       </div>

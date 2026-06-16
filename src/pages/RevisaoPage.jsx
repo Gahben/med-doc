@@ -76,6 +76,7 @@ export default function RevisaoPage() {
   // IA
   const [auditAlerts, setAuditAlerts] = useState(null)
   const [loadingAuditAlerts, setLoadingAuditAlerts] = useState(false)
+  const [auditAlertsError, setAuditAlertsError] = useState(false)
 
   const [sortField, sortDir] = sort.split(':')
 
@@ -155,13 +156,17 @@ export default function RevisaoPage() {
 
     setLoadingAuditAlerts(true)
     setAuditAlerts(null)
+    setAuditAlertsError(false)
     try {
       const res = await aiService.auditChecklist(row.id)
       if (res.data && res.data.alerts) {
         setAuditAlerts(res.data.alerts)
+      } else {
+        setAuditAlerts([])
       }
     } catch (err) {
       console.error(err)
+      setAuditAlertsError(true)
     } finally {
       setLoadingAuditAlerts(false)
     }
@@ -423,6 +428,10 @@ export default function RevisaoPage() {
                 <h4 className={styles.sectionTitle}>Checklist de Auditoria (IA)</h4>
                 {loadingAuditAlerts ? (
                   <p className={styles.sectionHint}>Analisando metadados do prontuário...</p>
+                ) : auditAlertsError ? (
+                  <div style={{ padding: '12px', background: 'var(--danger-light)', color: 'var(--danger)', borderRadius: '6px', fontSize: '14px', border: '1px solid var(--danger)' }}>
+                    <strong>Erro na Análise:</strong> Não foi possível gerar o checklist de auditoria. Verifique a chave da API (GEMINI_API_KEY) nos secrets do Supabase.
+                  </div>
                 ) : auditAlerts && auditAlerts.length > 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {auditAlerts.map((alert, i) => {
@@ -436,7 +445,9 @@ export default function RevisaoPage() {
                     })}
                   </div>
                 ) : (
-                  <p className={styles.sectionHint}>Nenhuma anomalia detectada nos metadados deste prontuário.</p>
+                  <div style={{ padding: '12px', background: 'var(--success-light)', color: 'var(--success)', borderRadius: '6px', fontSize: '14px', border: '1px solid var(--success)' }}>
+                    <strong>Tudo certo!</strong> Nenhuma anomalia detectada nos metadados deste prontuário.
+                  </div>
                 )}
               </div>
 
@@ -535,6 +546,11 @@ export default function RevisaoPage() {
                   </div>
                 ) : null
               })()}
+
+              {/* Prontuario Notes */}
+              <div className={styles.section} style={{ marginTop: '24px' }}>
+                <ProntuarioNotes prontuarioId={current.id} prontuario={current} />
+              </div>
             </div>
           </div>
         </div>

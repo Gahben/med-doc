@@ -128,9 +128,41 @@
   font-size: 11px;
   font-weight: 600;
 }
-.doc_approved { background: var(--accent-light); color: var(--accent); }
-.doc_reproved { background: var(--danger-light); color: var(--danger); }
-.doc_pending  { background: #fff3cd; color: #856404; }
+.doc_approved  { background: var(--accent-light); color: var(--accent); }
+.doc_reproved  { background: var(--danger-light); color: var(--danger); }
+.doc_pending   { background: #fff3cd; color: #856404; }
+.doc_completed { background: var(--info-light); color: var(--info); }
+.doc_rejected  { background: var(--danger-light); color: var(--danger); }
+
+.tdToken { color: var(--accent); font-weight: 700; }
+.thirdPartyHint { font-size: 11px; color: var(--text3); }
+.actionBtns { display: flex; gap: 6px; flex-wrap: wrap; }
+.btnVerAccent { color: var(--accent); border-color: var(--accent); }
+.btnVerMuted { color: var(--text3); }
+.sectionFirst { border-top: none; padding-top: 0; }
+.textareaFull { width: 100%; box-sizing: border-box; }
+.statusActions { border-top: none; padding-top: 0; margin-top: 0; }
+.btnFileActionFull { width: 100%; justify-content: center; }
+.btnStatusApprove,
+.btnStatusReject,
+.btnStatusComplete,
+.btnStatusPending {
+  flex: 1;
+  justify-content: center;
+  color: #fff;
+  border: none;
+}
+.btnStatusApprove  { background: var(--accent); }
+.btnStatusReject   { background: var(--danger); }
+.btnStatusComplete { background: var(--info); }
+.btnStatusPending  { background: #718096; }
+.btnStatusApprove:hover,
+.btnStatusReject:hover,
+.btnStatusComplete:hover,
+.btnStatusPending:hover {
+  opacity: 0.88;
+  color: #fff;
+}
 
 /* workflow badges */
 .wfBadge {
@@ -146,6 +178,7 @@
 .wf_danger  { background: var(--danger-light); color: var(--danger); }
 .wf_warning { background: #fff3cd; color: #856404; }
 .wf_purple  { background: var(--purple-light); color: var(--purple); }
+.wf_orange  { background: #fff3cd; color: #b45309; }
 .badgeNone  { font-size: 12px; color: var(--text3); }
 
 .btnVer {

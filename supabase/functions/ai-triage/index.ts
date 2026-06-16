@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { GoogleGenerativeAI } from 'https://esm.sh/@google/genai@0.1.1'
+import { GoogleGenerativeAI } from 'https://esm.sh/@google/generative-ai@0.21.0'
 
 Deno.serve(async (req) => {
   // CORS
@@ -10,7 +10,11 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const geminiKey = Deno.env.get('GEMINI_API_KEY')!
+    const geminiKey = Deno.env.get('GEMINI_API_KEY')
+
+    if (!geminiKey) {
+      return new Response(JSON.stringify({ error: 'GEMINI_API_KEY not configured in Supabase Secrets' }), { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } })
+    }
 
     const supabase = createClient(supabaseUrl, supabaseKey)
     
@@ -53,15 +57,15 @@ Deno.serve(async (req) => {
 
     // 3. Chamar Gemini
     const ai = new GoogleGenerativeAI(geminiKey)
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-        config: {
-            responseMimeType: "application/json",
-        }
+    const model = ai.getGenerativeModel({
+      model: 'gemini-2.5-flash',
+      generationConfig: {
+        responseMimeType: "application/json",
+      }
     })
-
-    const resultText = response.text
+    
+    const response = await model.generateContent(prompt)
+    const resultText = response.response.text()
     const aiData = JSON.parse(resultText)
 
     // 4. Salvar resultado

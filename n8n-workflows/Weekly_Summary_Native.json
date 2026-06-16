@@ -1,0 +1,153 @@
+{
+  "name": "Resumo Semanal - Nativo Supabase",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks"
+            }
+          ]
+        }
+      },
+      "id": "e5b7c7b8-6d2c-49a7-8c38-8c121e7d0f33",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "table": "patient_requests",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "created_at",
+              "condition": "gte",
+              "keyValue": "={{$today.minus({days: 7}).toISODate()}}"
+            }
+          ]
+        }
+      },
+      "id": "8bb38f1a-dbcc-4845-a9f4-279c6d54231b",
+      "name": "Get Requests (Supabase)",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        420,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "aggregateItems",
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {
+              "fieldToAggregate": "workflow_status"
+            },
+            {
+              "fieldToAggregate": "request_reason"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "item-lists-1",
+      "name": "Item Lists",
+      "type": "n8n-nodes-base.itemLists",
+      "typeVersion": 3,
+      "position": [
+        640,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "model": "gemini-2.5-flash",
+        "prompt": "={{ 'Analise as solicitações da última semana e gere um resumo gerencial (indicadores, gargalos). Dados:\\n' + JSON.stringify($json) }}"
+      },
+      "id": "gemini-ai",
+      "name": "Gemini AI",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1,
+      "position": [
+        860,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "prontuario_notes",
+        "columns": "prontuario_id, author_id, note_type, content",
+        "data": {
+          "prontuario_id": "00000000-0000-0000-0000-000000000000",
+          "author_id": "00000000-0000-0000-0000-000000000000",
+          "note_type": "system",
+          "content": "={{ $json.output }}"
+        }
+      },
+      "id": "save-summary",
+      "name": "Save Summary",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1080,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Requests (Supabase)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Requests (Supabase)": {
+      "main": [
+        [
+          {
+            "node": "Item Lists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Item Lists": {
+      "main": [
+        [
+          {
+            "node": "Gemini AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini AI": {
+      "main": [
+        [
+          {
+            "node": "Save Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

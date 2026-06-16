@@ -156,12 +156,18 @@ export async function applyWorkflowTransition({
   const legacyStatus = legacyStatusFromWorkflow(workflowStatus)
 
   if (reqId) {
+    let finalNotes = note;
+    if (note) {
+      const { data: currReq } = await supabase.from('patient_requests').select('notes').eq('id', reqId).maybeSingle()
+      finalNotes = currReq?.notes ? `${currReq.notes}\n---\n[Sistema - Transição para ${workflowStatus}]: ${note}` : `[Sistema - Transição para ${workflowStatus}]: ${note}`
+    }
+
     const { error } = await supabase
       .from('patient_requests')
       .update({
         workflow_status: workflowStatus,
         status: legacyStatus,
-        notes: note,
+        ...(note ? { notes: finalNotes } : {}),
         received_by: userId,
         received_at: userId ? now : null,
         updated_at: now,
@@ -175,11 +181,18 @@ export async function applyWorkflowTransition({
       .from('prontuarios')
       .update({
         workflow_status: workflowStatus,
-        ...(note ? { workflow_note: note } : {}),
         updated_at: now,
       })
       .eq('id', proId)
     if (error) throw error
+
+    if (note && userId) {
+      await supabase.from('prontuario_notes').insert({
+        prontuario_id: proId,
+        author_id: userId,
+        body: `[Transição para ${workflowStatus}]: ${note}`
+      })
+    }
   }
 
   return { patientRequestId: reqId, prontuarioId: proId }
