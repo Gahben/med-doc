@@ -1,15 +1,19 @@
 -- ============================================================
--- MedDoc — Migração 013: Permite upload público de solicitações assinadas
--- Execute no SQL Editor do Supabase
+-- MedDoc - Migration 013: public upload for signed patient requests
 -- ============================================================
 
--- Permite que qualquer usuário (incluindo anônimos/públicos) faça upload na pasta patient_requests/
+-- The patient request form is public/anonymous, but the signed PDF is stored
+-- in the private "prontuarios" bucket under patient_requests/.
 DROP POLICY IF EXISTS "storage_public_upload_patient_requests" ON storage.objects;
 
-CREATE POLICY "storage_public_upload_patient_requests" ON storage.objects FOR INSERT
-  WITH CHECK (
-    bucket_id = 'prontuarios' 
-    AND (position('patient_requests/' in name) = 1)
-  );
+CREATE POLICY "storage_public_upload_patient_requests"
+ON storage.objects
+FOR INSERT
+TO anon, authenticated
+WITH CHECK (
+  bucket_id = 'prontuarios'
+  AND name LIKE 'patient_requests/%'
+  AND lower(name) LIKE '%.pdf'
+);
 
-SELECT 'Migração 013 aplicada com sucesso!' AS status;
+SELECT 'Migration 013 applied successfully.' AS status;
