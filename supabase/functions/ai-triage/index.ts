@@ -53,6 +53,7 @@ Deno.serve(async (req) => {
       2. "urgency_reason": Breve justificativa para o nível escolhido.
       3. "summary": Resumo da solicitação em uma única frase.
       4. "inconsistencies": Array de strings listando qualquer informação que pareça estranha ou inconsistente (ex: datas impossíveis, faltam dados vitals). Array vazio se não houver.
+      5. "prontuario_notes": Notas explicativas ou recomendações clínicas/administrativas extraídas ou inferidas dos dados da solicitação para guiar os operadores ao organizar o prontuário (uma string simples ou null).
     `
 
     // 3. Chamar Gemini

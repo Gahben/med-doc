@@ -444,7 +444,7 @@ export const prontuariosService = {
     // 4. Cria primeira versão no histórico
     await documentVersionsService.create({
       prontuario_id: prontuario.id,
-      version_number: 1,
+      version: 1,
       file_path: path,
       file_name: file.name,
       file_size: file.size,
@@ -518,7 +518,7 @@ export const prontuariosService = {
 
     await documentVersionsService.create({
       prontuario_id: prontuarioId,
-      version_number: nextVersion,
+      version: nextVersion,
       file_path: path,
       file_name: file.name,
       file_size: file.size,
@@ -587,14 +587,14 @@ export const documentVersionsService = {
    */
   list: (prontuarioId) =>
     supabase
-      .from('document_versions')
+      .from('prontuario_versions')
       .select('*, profiles!uploaded_by(name, role)')
       .eq('prontuario_id', prontuarioId)
-      .order('version_number', { ascending: false }),
+      .order('version', { ascending: false }),
 
   /** Registra uma nova versão (chamado a cada upload/reenvio) */
   create: (data) =>
-    supabase.from('document_versions').insert(data),
+    supabase.from('prontuario_versions').insert(data),
 
   /**
    * Retorna o próximo número de versão para um prontuário.
@@ -602,13 +602,13 @@ export const documentVersionsService = {
    */
   nextVersion: async (prontuarioId) => {
     const { data } = await supabase
-      .from('document_versions')
-      .select('version_number')
+      .from('prontuario_versions')
+      .select('version')
       .eq('prontuario_id', prontuarioId)
-      .order('version_number', { ascending: false })
+      .order('version', { ascending: false })
       .limit(1)
       .maybeSingle()
-    return data ? data.version_number + 1 : 1
+    return data ? data.version + 1 : 1
   },
 }
 

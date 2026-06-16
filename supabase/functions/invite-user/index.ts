@@ -45,8 +45,8 @@ Deno.serve(async (req) => {
 
     const { email, role = 'operador', name = '' } = await req.json()
     if (!email) throw new Error('E-mail obrigatório')
-    if (!['admin', 'revisor', 'operador'].includes(role)) {
-      throw new Error('Role inválido. Use: admin, revisor ou operador')
+    if (!['admin', 'revisor', 'operador', 'auditor'].includes(role)) {
+      throw new Error('Role inválido. Use: admin, revisor, operador ou auditor')
     }
 
     // Client admin (service role) para criar o usuário

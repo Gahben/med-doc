@@ -24,7 +24,7 @@
     {
       "parameters": {
         "operation": "getAll",
-        "table": "document_versions",
+        "table": "prontuario_versions",
         "returnAll": true,
         "filters": {
           "conditions": [
@@ -57,7 +57,7 @@
               "fieldToAggregate": "file_size"
             },
             {
-              "fieldToAggregate": "version_number"
+              "fieldToAggregate": "version"
             }
           ]
         },

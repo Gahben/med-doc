@@ -37,10 +37,10 @@ Deno.serve(async (req) => {
 
     // 2. Buscar histórico de versões do documento
     const { data: versions, error: versionsError } = await supabase
-      .from('document_versions')
-      .select('version_number, file_size, created_at')
+      .from('prontuario_versions')
+      .select('version, file_size, created_at')
       .eq('prontuario_id', prontuario_id)
-      .order('version_number', { ascending: true })
+      .order('version', { ascending: true })
 
     // 3. Preparar prompt
     const prompt = `
@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
       - Tamanho do arquivo atual: ${prontuario.file_size} bytes
       - Setor de origem: ${prontuario.origin_sector || 'Não informado'}
       - Histórico de reenvios:
-        ${versions && versions.length > 0 ? versions.map(v => `V${v.version_number}: ${v.file_size} bytes em ${v.created_at}`).join('\n        ') : 'Nenhuma versão anterior'}
+        ${versions && versions.length > 0 ? versions.map(v => `V${v.version}: ${v.file_size} bytes em ${v.created_at}`).join('\n        ') : 'Nenhuma versão anterior'}
       
       REGRAS DE ANÁLISE:
       - Se "Prontuário médico" tiver apenas 1 página, é suspeito (costumam ser longos).

@@ -1,0 +1,402 @@
+[
+  {
+    "id": 1,
+    "requester_name": "Carlos Eduardo Souza",
+    "request_reason": "Paciente internado na UTI em estado gravíssimo. Necessitamos do prontuário imediatamente para transferência de hospital nas próximas horas.",
+    "hospital_period": "Junho de 2026",
+    "expected_urgency": "critical",
+    "notes": "Urgente, risco de morte"
+  },
+  {
+    "id": 2,
+    "requester_name": "Ana Julia Rezende",
+    "request_reason": "Preciso do prontuário para dar entrada em liminar judicial urgente para liberação de cirurgia cardíaca de urgência.",
+    "hospital_period": "Maio de 2026",
+    "expected_urgency": "critical",
+    "notes": "Processo judicial"
+  },
+  {
+    "id": 3,
+    "requester_name": "Beatriz Martins",
+    "request_reason": "Paciente faleceu na semana passada e a família precisa do prontuário para dar entrada no inventário e liberação de seguro.",
+    "hospital_period": "Janeiro de 2026",
+    "expected_urgency": "critical",
+    "notes": "Paciente falecido (óbito)"
+  },
+  {
+    "id": 4,
+    "requester_name": "Marcos Vieira Lima",
+    "request_reason": "Continuidade de tratamento oncológico (quimioterapia) em outra instituição na próxima semana.",
+    "hospital_period": "Dezembro de 2025",
+    "expected_urgency": "high",
+    "notes": "Oncologia, tratamento contínuo"
+  },
+  {
+    "id": 5,
+    "requester_name": "Fernanda Gomes",
+    "request_reason": "Apresentação na perícia médica do INSS agendada para quarta-feira que vem.",
+    "hospital_period": "Março de 2026",
+    "expected_urgency": "medium",
+    "notes": "Perícia do INSS"
+  },
+  {
+    "id": 6,
+    "requester_name": "Ricardo Alves",
+    "request_reason": "Apenas para controle pessoal e guardar meu histórico médico em casa.",
+    "hospital_period": "Outubro de 2024",
+    "expected_urgency": "low",
+    "notes": "Rotina"
+  },
+  {
+    "id": 7,
+    "requester_name": "Patricia Santos Silva",
+    "request_reason": "Consulta de retorno com novo dermatologista para mostrar histórico de exames antigos.",
+    "hospital_period": "Agosto de 2025",
+    "expected_urgency": "low",
+    "notes": "Retorno de consulta"
+  },
+  {
+    "id": 8,
+    "requester_name": "Juliana Costa Mendes",
+    "request_reason": "Transferência de tratamento de hemodiálise urgente. Preciso do histórico completo.",
+    "hospital_period": "Fevereiro de 2026",
+    "expected_urgency": "high",
+    "notes": "Tratamento essencial de hemodiálise"
+  },
+  {
+    "id": 9,
+    "requester_name": "Roberto Farias",
+    "request_reason": "Cirurgia ortopédica eletiva agendada para daqui a 3 semanas.",
+    "hospital_period": "Abril de 2026",
+    "expected_urgency": "medium",
+    "notes": "Cirurgia eletiva"
+  },
+  {
+    "id": 10,
+    "requester_name": "Lucas Pires",
+    "request_reason": "Revisão de contas médicas e faturamento para contestar cobrança do convênio.",
+    "hospital_period": "Novembro de 2025",
+    "expected_urgency": "low",
+    "notes": "Revisão de contas"
+  },
+  {
+    "id": 11,
+    "requester_name": "Amanda Oliveira",
+    "request_reason": "Paciente internado no pronto-socorro com suspeita de infarto, equipe médica solicita prontuário anterior.",
+    "hospital_period": "Ano de 2025",
+    "expected_urgency": "critical",
+    "notes": "Infarto, emergência médica"
+  },
+  {
+    "id": 12,
+    "requester_name": "Gabriel Santos",
+    "request_reason": "Paciente oncológico precisando trocar de medicação de alto custo no SUS com urgência.",
+    "hospital_period": "Maio de 2026",
+    "expected_urgency": "high",
+    "notes": "Medicamento de alto custo SUS"
+  },
+  {
+    "id": 13,
+    "requester_name": "Mariana Toledo",
+    "request_reason": "Perícia trabalhista por acidente de trabalho em processo contra ex-empregador.",
+    "hospital_period": "Setembro de 2025",
+    "expected_urgency": "medium",
+    "notes": "Processo trabalhista / perícia"
+  },
+  {
+    "id": 14,
+    "requester_name": "Bruno Ferreira",
+    "request_reason": "Segunda opinião médica para tratamento de asma grave.",
+    "hospital_period": "Fevereiro de 2026",
+    "expected_urgency": "medium",
+    "notes": "Segunda opinião"
+  },
+  {
+    "id": 15,
+    "requester_name": "Camila Santana",
+    "request_reason": "Cópia para fins de aposentadoria especial por exposição a agentes insalubres.",
+    "hospital_period": "2020 a 2022",
+    "expected_urgency": "low",
+    "notes": "Aposentadoria"
+  },
+  {
+    "id": 16,
+    "requester_name": "Rodrigo Ramos",
+    "request_reason": "Paciente em coma induzido na UTI. A família precisa de cópia para fins judiciais e tutela.",
+    "hospital_period": "Corrente",
+    "expected_urgency": "critical",
+    "notes": "UTI, coma, tutela judicial"
+  },
+  {
+    "id": 17,
+    "requester_name": "Renata Lima",
+    "request_reason": "Tratamento de radioterapia com data de início agendada para os próximos dias.",
+    "hospital_period": "Abril de 2026",
+    "expected_urgency": "high",
+    "notes": "Radioterapia"
+  },
+  {
+    "id": 18,
+    "requester_name": "Thiago Martins",
+    "request_reason": "Conferência de dados sobre alta médica de internação anterior.",
+    "hospital_period": "Março de 2026",
+    "expected_urgency": "low",
+    "notes": "Rotina"
+  },
+  {
+    "id": 19,
+    "requester_name": "Gabriela Souza",
+    "request_reason": "Perícia judicial do seguro DPVAT marcada para a próxima semana.",
+    "hospital_period": "Agosto de 2025",
+    "expected_urgency": "medium",
+    "notes": "Seguro DPVAT"
+  },
+  {
+    "id": 20,
+    "requester_name": "Felipe Nogueira",
+    "request_reason": "Paciente menor de idade necessitando de histórico vacinal e internações para matrícula em escola especial.",
+    "hospital_period": "2024",
+    "expected_urgency": "low",
+    "notes": "Matrícula escolar"
+  },
+  {
+    "id": 21,
+    "requester_name": "Julio Cezar",
+    "request_reason": "Ação civil pública visando fornecimento de leito de UTI neonatal para recém-nascido.",
+    "hospital_period": "Junho de 2026",
+    "expected_urgency": "critical",
+    "notes": "UTI neonatal, liminar urgente"
+  },
+  {
+    "id": 22,
+    "requester_name": "Karina Dias",
+    "request_reason": "Dar entrada em cirurgia bariátrica indicada por urgência metabólica em 15 dias.",
+    "hospital_period": "Março de 2026",
+    "expected_urgency": "high",
+    "notes": "Cirurgia metabólica urgente"
+  },
+  {
+    "id": 23,
+    "requester_name": "Fabio Junior",
+    "request_reason": "Perícia médica para concessão de auxílio-doença.",
+    "hospital_period": "Janeiro de 2026",
+    "expected_urgency": "medium",
+    "notes": "Auxílio-doença"
+  },
+  {
+    "id": 24,
+    "requester_name": "Leticia Cardoso",
+    "request_reason": "Mudança de médico obstetra na reta final da gestação (36 semanas).",
+    "hospital_period": "Gestação atual",
+    "expected_urgency": "high",
+    "notes": "Gestação de alto risco / reta final"
+  },
+  {
+    "id": 25,
+    "requester_name": "Daniel Silva",
+    "request_reason": "Apenas por curiosidade de rever o relatório da cirurgia que fiz em 2021.",
+    "hospital_period": "Dezembro de 2021",
+    "expected_urgency": "low",
+    "notes": "Curiosidade"
+  },
+  {
+    "id": 26,
+    "requester_name": "Isabela Pinheiro",
+    "request_reason": "Dar entrada em home care determinado judicialmente sob pena de multa diária.",
+    "hospital_period": "Maio de 2026",
+    "expected_urgency": "critical",
+    "notes": "Home care judicial"
+  },
+  {
+    "id": 27,
+    "requester_name": "André Luiz",
+    "request_reason": "Continuidade de pré-natal de alto risco devido a pré-eclâmpsia.",
+    "hospital_period": "Fevereiro de 2026",
+    "expected_urgency": "high",
+    "notes": "Pré-eclâmpsia"
+  },
+  {
+    "id": 28,
+    "requester_name": "Vanessa Ribeiro",
+    "request_reason": "Avaliação de junta médica para liberação de transplante renal.",
+    "hospital_period": "Novembro de 2025",
+    "expected_urgency": "high",
+    "notes": "Transplante de órgãos"
+  },
+  {
+    "id": 29,
+    "requester_name": "Marcelo Diniz",
+    "request_reason": "Dar entrada em seguro de vida após falecimento de titular (cônjuge).",
+    "hospital_period": "Abril de 2026",
+    "expected_urgency": "critical",
+    "notes": "Óbito, seguro de vida"
+  },
+  {
+    "id": 30,
+    "requester_name": "Tatiana Xavier",
+    "request_reason": "Consulta de rotina anual com ginecologista.",
+    "hospital_period": "Julho de 2025",
+    "expected_urgency": "low",
+    "notes": "Rotina"
+  },
+  {
+    "id": 31,
+    "requester_name": "Otavio Netto",
+    "request_reason": "Paciente vítima de queimadura grave aguardando vaga em ala especializada de tratamento intensivo.",
+    "hospital_period": "Corrente",
+    "expected_urgency": "critical",
+    "notes": "Queimadura grave, vaga intensiva"
+  },
+  {
+    "id": 32,
+    "requester_name": "Carla Pimentel",
+    "request_reason": "Solicitação para fins judiciais de comprovação de paternidade / teste de DNA realizado em laboratório interno.",
+    "hospital_period": "Setembro de 2025",
+    "expected_urgency": "medium",
+    "notes": "Fins judiciais (não de UTI/óbito)"
+  },
+  {
+    "id": 33,
+    "requester_name": "Alexandre Silva",
+    "request_reason": "Paciente oncológico em fase terminal, família requer cópia para adequações paliativas residenciais urgentes.",
+    "hospital_period": "Maio de 2026",
+    "expected_urgency": "high",
+    "notes": "Fase terminal, cuidados paliativos"
+  },
+  {
+    "id": 34,
+    "requester_name": "Sofia Bueno",
+    "request_reason": "Consulta de aconselhamento genético após resultado de biópsia gestacional.",
+    "hospital_period": "Março de 2026",
+    "expected_urgency": "medium",
+    "notes": "Aconselhamento genético"
+  },
+  {
+    "id": 35,
+    "requester_name": "Diego Borges",
+    "request_reason": "Desejo verificar o tipo de prótese ortopédica utilizada no joelho há dois anos.",
+    "hospital_period": "Janeiro de 2024",
+    "expected_urgency": "low",
+    "notes": "Rotina / controle"
+  },
+  {
+    "id": 36,
+    "requester_name": "Luana Ferraz",
+    "request_reason": "Paciente infantil com meningite bacteriana grave em isolamento. Médico necessita histórico do ano anterior.",
+    "hospital_period": "2025",
+    "expected_urgency": "critical",
+    "notes": "Meningite bacteriana grave"
+  },
+  {
+    "id": 37,
+    "requester_name": "Victor Hugo",
+    "request_reason": "Entrada em procedimento de quimioterapia para tumor cerebral agressivo.",
+    "hospital_period": "Junho de 2026",
+    "expected_urgency": "high",
+    "notes": "Quimioterapia de tumor agressivo"
+  },
+  {
+    "id": 38,
+    "requester_name": "Milena Costa",
+    "request_reason": "Perícia médica do DPVAT para indenização por fratura de fêmur decorrente de colisão automobilística.",
+    "hospital_period": "Outubro de 2025",
+    "expected_urgency": "medium",
+    "notes": "DPVAT perícia"
+  },
+  {
+    "id": 39,
+    "requester_name": "Matheus Ramos",
+    "request_reason": "Mudança de plano de saúde exige histórico de internações para carência.",
+    "hospital_period": "2023 a 2025",
+    "expected_urgency": "low",
+    "notes": "Carência de convênio"
+  },
+  {
+    "id": 40,
+    "requester_name": "Elisa Moreira",
+    "request_reason": "Paciente em parada cardiorrespiratória no pronto atendimento, solicitando ficha de alergias e procedimentos urgentes anteriores.",
+    "hospital_period": "Historico",
+    "expected_urgency": "critical",
+    "notes": "PCR, emergência máxima"
+  },
+  {
+    "id": 41,
+    "requester_name": "Arthur Antunes",
+    "request_reason": "Procedimento de transplante de medula óssea agendado para o fim do mês.",
+    "hospital_period": "Maio de 2026",
+    "expected_urgency": "high",
+    "notes": "Transplante de medula"
+  },
+  {
+    "id": 42,
+    "requester_name": "Helena Viana",
+    "request_reason": "Apresentação em junta médica do Exército para isenção por comorbidade física.",
+    "hospital_period": "Agosto de 2025",
+    "expected_urgency": "medium",
+    "notes": "Junta militar / isenção"
+  },
+  {
+    "id": 43,
+    "requester_name": "Guilherme Santos",
+    "request_reason": "Retirada de relatório de internação para fins de licença médica no trabalho por 15 dias.",
+    "hospital_period": "Abril de 2026",
+    "expected_urgency": "low",
+    "notes": "Atestado / Licença"
+  },
+  {
+    "id": 44,
+    "requester_name": "Lorena Furtado",
+    "request_reason": "Paciente grávida em trabalho de parto ativo prematuro (31 semanas). Histórico pré-natal necessário para UTI Neonatal prévia.",
+    "hospital_period": "Gestacao atual",
+    "expected_urgency": "critical",
+    "notes": "Trabalho de parto prematuro"
+  },
+  {
+    "id": 45,
+    "requester_name": "Samuel Rocha",
+    "request_reason": "Tratamento de imunoterapia contínua para artrite reumatoide grave.",
+    "hospital_period": "Dezembro de 2025",
+    "expected_urgency": "high",
+    "notes": "Imunoterapia contínua"
+  },
+  {
+    "id": 46,
+    "requester_name": "Vivian Medeiros",
+    "request_reason": "Homologação de atestado por perícia oficial do município para servidora pública afastada por depressão.",
+    "hospital_period": "Janeiro de 2026",
+    "expected_urgency": "medium",
+    "notes": "Homologação de atestado"
+  },
+  {
+    "id": 47,
+    "requester_name": "Igor Lacerda",
+    "request_reason": "Requerimento de prontuário para guarda de documentos do filho nascido na maternidade em 2024.",
+    "hospital_period": "Julho de 2024",
+    "expected_urgency": "low",
+    "notes": "Controle pessoal"
+  },
+  {
+    "id": 48,
+    "requester_name": "Clarice Lispector",
+    "request_reason": "Paciente idosa com fratura exposta de quadril necessitando de cirurgia ortopédica de urgência.",
+    "hospital_period": "Junho de 2026",
+    "expected_urgency": "critical",
+    "notes": "Fratura exposta, cirurgia de urgência"
+  },
+  {
+    "id": 49,
+    "requester_name": "Joao Cabral",
+    "request_reason": "Internação devido a crise convulsiva severa refratária para avaliação de nova droga antiepiléptica.",
+    "hospital_period": "Março de 2026",
+    "expected_urgency": "high",
+    "notes": "Crise convulsiva severa, tratamento"
+  },
+  {
+    "id": 50,
+    "requester_name": "Cecilia Meireles",
+    "request_reason": "Segunda via de prontuário de internação obstétrica há 10 anos.",
+    "hospital_period": "Junho de 2016",
+    "expected_urgency": "low",
+    "notes": "Rotina / Histórico antigo"
+  }
+]
