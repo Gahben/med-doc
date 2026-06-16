@@ -559,6 +559,36 @@ export default function RevisaoPage() {
                   )}
                 </div>
               )}
+{/* PAINEL DE TRIAGEM DE URGÊNCIA DA IA (DINÂMICO) */}
+     {current?.urgencia && (
+       <div style={{ marginTop: '20px', marginBottom: '20px', borderTop: '1px solid #e2e8f0', paddingTop: '15px', width: '100%' }}>
+         <h3 style={{ margin: '0 0 10px 0', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: '600' }}>
+           🤖 Triagem de Prioridade (MED-DOC IA)
+         </h3>
+         <div style={{ backgroundColor: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '12px' }}>
+           <div style={{ 
+             backgroundColor: '#fff', 
+             padding: '12px', 
+             borderRadius: '4px', 
+             border: '1px solid #e2e8f0', 
+             borderLeft: current.urgencia.toUpperCase() === 'ALTA' ? '4px solid #ef4444' : '4px solid #eab308' 
+           }}>
+             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', alignItems: 'center' }}>
+               <strong style={{ 
+                 fontSize: '12px', 
+                 color: current.urgencia.toUpperCase() === 'ALTA' ? '#ef4444' : '#eab308' 
+               }}>
+                 {current.urgencia.toUpperCase() === 'ALTA' ? '🔴 PRIORIDADE: ALTA URGÊNCIA' : '🟡 PRIORIDADE: MODERADA / BAIXA'}
+               </strong>
+               <span style={{ fontSize: '10px', color: '#94a3b8' }}>Análise via n8n</span>
+             </div>
+             <p style={{ margin: 0, fontSize: '12px', color: '#334155', lineHeight: '1.4' }}>
+               <strong>Justificativa da IA:</strong> {current.justificativa_ia}
+             </p>
+           </div>
+         </div>
+       </div>
+     )}
 
               {/* Ações de fluxo (workflow) */}
               {(() => {
