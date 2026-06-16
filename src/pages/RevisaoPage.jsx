@@ -73,10 +73,11 @@ export default function RevisaoPage() {
   const [wfNote,       setWfNote]       = useState('')
   const [savingWf,     setSavingWf]     = useState(false)
 
-  // IA
+  // IA & Request Details
   const [auditAlerts, setAuditAlerts] = useState(null)
   const [loadingAuditAlerts, setLoadingAuditAlerts] = useState(false)
   const [auditAlertsError, setAuditAlertsError] = useState(false)
+  const [requestDetails, setRequestDetails] = useState(null)
 
   const [sortField, sortDir] = sort.split(':')
 
@@ -137,6 +138,17 @@ export default function RevisaoPage() {
     setIsPdf(false)
     setWfAction('')
     setWfNote('')
+    setRequestDetails(null)
+
+    if (row.patient_request_id) {
+      supabase
+        .from('patient_requests')
+        .select('*, ai_triage_results(*)')
+        .eq('id', row.patient_request_id)
+        .single()
+        .then(({ data }) => setRequestDetails(data))
+        .catch(console.error)
+    }
 
     if (row.file_path) {
       setLoadingUrl(true)
@@ -426,6 +438,9 @@ export default function RevisaoPage() {
               {/* Checklist de Auditoria IA */}
               <div className={styles.section}>
                 <h4 className={styles.sectionTitle}>Checklist de Auditoria (IA)</h4>
+                <p className={styles.sectionHint} style={{ marginBottom: '8px' }}>
+                  Análise automática dos metadados e versões do arquivo atual.
+                </p>
                 {loadingAuditAlerts ? (
                   <p className={styles.sectionHint}>Analisando metadados do prontuário...</p>
                 ) : auditAlertsError ? (
@@ -450,6 +465,39 @@ export default function RevisaoPage() {
                   </div>
                 )}
               </div>
+
+              {/* Request Details & Triage */}
+              {requestDetails && (
+                <div className={styles.section}>
+                  <h4 className={styles.sectionTitle}>Triagem da Solicitação Original (IA)</h4>
+                  <p className={styles.sectionHint} style={{ marginBottom: '8px' }}>
+                    Motivo do pedido: {requestDetails.request_reason}
+                  </p>
+                  
+                  {requestDetails.ai_triage_results && requestDetails.ai_triage_results.length > 0 ? (
+                    <dl className={styles.detailGrid} style={{ background: 'var(--info-light)', padding: '12px', borderRadius: '8px' }}>
+                      <div className={styles.colSpan2}>
+                        <dt style={{ color: 'var(--info)' }}>Resumo do Pedido</dt>
+                        <dd>{requestDetails.ai_triage_results[0].summary}</dd>
+                      </div>
+                      {requestDetails.ai_triage_results[0].inconsistencies && requestDetails.ai_triage_results[0].inconsistencies.length > 0 && (
+                        <div className={styles.colSpan2}>
+                          <dt style={{ color: 'var(--danger)' }}>Inconsistências Reportadas na Entrada</dt>
+                          <dd>
+                            <ul style={{ margin: 0, paddingLeft: '16px' }}>
+                              {requestDetails.ai_triage_results[0].inconsistencies.map((inc, i) => (
+                                <li key={i} style={{ color: 'var(--danger)', fontSize: '13px' }}>{inc}</li>
+                              ))}
+                            </ul>
+                          </dd>
+                        </div>
+                      )}
+                    </dl>
+                  ) : (
+                    <p className={styles.sectionHint}>Nenhuma triagem automatizada encontrada para a solicitação original.</p>
+                  )}
+                </div>
+              )}
 
               {/* Arquivo: visualização inline + download + impressão */}
               {current.file_path && (

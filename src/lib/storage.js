@@ -14,6 +14,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js'
+import { PDFDocument } from 'pdf-lib'
 
 // ==================== CLIENTE SUPABASE ====================
 
@@ -273,6 +274,28 @@ export async function checkDuplicateHash(hash) {
   return data ?? null
 }
 
+/**
+ * Tenta extrair a quantidade de páginas do arquivo automaticamente (se for PDF ou Imagem).
+ * @param {File} file
+ * @returns {Promise<number|null>} número de páginas ou null
+ */
+export async function getPageCount(file) {
+  if (!file) return null;
+  if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdfDoc = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+      return pdfDoc.getPageCount();
+    } catch (e) {
+      console.warn("Falha ao ler páginas do PDF:", e);
+      return null;
+    }
+  } else if (file.type && file.type.startsWith('image/')) {
+    return 1;
+  }
+  return null;
+}
+
 // ==================== AUTH ====================
 
 export const authService = {
@@ -382,10 +405,11 @@ export const prontuariosService = {
       )
     }
 
-    // 2. Upload do arquivo
+    // Upload do arquivo e contagem de páginas
     const ext = file.name.split('.').pop()
     const path = `${metadata.uploaded_by}/${Date.now()}_${metadata.record_number}.${ext}`
     await storageService.upload(file, path)
+    const pages = await getPageCount(file)
 
     const linkedRequestId = metadata.patient_request_id || null
     const initialWorkflow = linkedRequestId ? 'in_audit' : (metadata.workflow_status || null)
@@ -397,6 +421,7 @@ export const prontuariosService = {
       file_name: file.name,
       file_size: file.size,
       file_hash: fileHash,
+      pages: pages,
       status: 'pending',
       workflow_status: initialWorkflow,
       patient_request_id: linkedRequestId,
@@ -470,6 +495,7 @@ export const prontuariosService = {
     const path = `${userId}/${Date.now()}_resubmit.${ext}`
 
     await storageService.upload(file, path)
+    const pages = await getPageCount(file)
 
     const nextVersion = await documentVersionsService.nextVersion(prontuarioId)
 
@@ -481,6 +507,7 @@ export const prontuariosService = {
         file_name: file.name,
         file_size: file.size,
         file_hash: fileHash,
+        pages: pages,
         resubmit_note: note?.trim() || null,
         reviewed_at: null,
         reviewed_by: null,
