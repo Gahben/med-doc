@@ -611,3 +611,64 @@
   height: 14px;
   flex-shrink: 0;
 }
+
+/* ─── AI TRIAGE NOTES ─────────────────────────────────────────── */
+.aiNotesBox {
+  background: var(--accent-light);
+  border: 1px solid rgba(59,130,246,0.2);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+
+.aiNotesBox p {
+  font-size: 13px;
+  color: var(--text);
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+.urgencyBadge {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
+}
+
+.urgencyLabel {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.urgency_low {
+  background: #e8f4fd;
+  color: #1a5f8a;
+}
+
+.urgency_medium {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.urgency_high {
+  background: var(--danger-light);
+  color: var(--danger);
+}
+
+.urgency_critical {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid rgba(153,27,27,0.3);
+}
+
+.urgencyReason {
+  font-size: 12px;
+  color: var(--text2);
+  font-style: italic;
+}

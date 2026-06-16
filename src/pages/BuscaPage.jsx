@@ -38,6 +38,7 @@ export default function BuscaPage() {
   // Modal de detalhe
   const [selected,        setSelected]        = useState(null)
   const [linkedRequest,   setLinkedRequest]   = useState(null)
+  const [aiTriageResult,  setAiTriageResult]  = useState(null)
   const [fileUrl,         setFileUrl]         = useState('')
   const [showInlinePdf,   setShowInlinePdf]   = useState(false)
   const [isPdf,           setIsPdf]           = useState(false)
@@ -126,6 +127,7 @@ export default function BuscaPage() {
   function closeDetail() {
     setSelected(null)
     setLinkedRequest(null)
+    setAiTriageResult(null)
     setFileUrl('')
     setShowInlinePdf(false)
   }
@@ -331,6 +333,25 @@ export default function BuscaPage() {
               <div><dt>Telefone</dt><dd>{linkedRequest.contact_phone || '—'}</dd></div>
               <div><dt>Status da solicitação</dt><dd><WfBadge status={linkedRequest.workflow_status} /></dd></div>
             </dl>
+
+            {aiTriageResult && aiTriageResult.prontuario_notes && (
+              <div className={styles.fileSection}>
+                <h4 className={styles.sectionTitle}>Notas do Prontuário (IA)</h4>
+                <div className={styles.aiNotesBox}>
+                  <p>{aiTriageResult.prontuario_notes}</p>
+                </div>
+                {aiTriageResult.urgency_level && (
+                  <div className={styles.urgencyBadge}>
+                    <span className={`${styles.urgencyLabel} ${styles['urgency_' + aiTriageResult.urgency_level]}`}>
+                      Urgência: {aiTriageResult.urgency_level}
+                    </span>
+                    {aiTriageResult.urgency_reason && (
+                      <span className={styles.urgencyReason}>{aiTriageResult.urgency_reason}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
