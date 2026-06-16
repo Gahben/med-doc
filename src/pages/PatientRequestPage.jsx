@@ -217,6 +217,12 @@ export default function PatientRequestPage() {
       
       if (error) throw error
       
+      // Chamar IA para triagem da solicitação (background, não bloqueia)
+      const { aiService } = await import('../lib/storage')
+      aiService.triage(data.id).catch(err => {
+        console.error('Erro na triagem IA:', err)
+      })
+      
       // Gera PDF para download
       const doc = generatePDF({
         ...formData,

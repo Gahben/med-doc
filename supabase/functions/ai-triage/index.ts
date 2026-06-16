@@ -73,6 +73,7 @@ Deno.serve(async (req) => {
         urgency_reason: aiData.urgency_reason,
         summary: aiData.summary,
         inconsistencies: aiData.inconsistencies || [],
+        prontuario_notes: aiData.prontuario_notes || null,
         raw_response: aiData
       })
       .select()

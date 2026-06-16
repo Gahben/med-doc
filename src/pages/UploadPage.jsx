@@ -202,6 +202,12 @@ export default function UploadPage() {
 
       if (selectedRequestId) {
         await notifyWorkflowChange('in_audit', prontuario, user.id)
+        
+        // Chamar IA para checklist de auditoria (background, não bloqueia)
+        const { aiService } = await import('../lib/storage')
+        aiService.auditChecklist(prontuario.id).catch(err => {
+          console.error('Erro no checklist de auditoria IA:', err)
+        })
       }
 
       await log('upload', `Enviou prontuário ${form.record_number} de ${form.patient_name}`, prontuario.id)
